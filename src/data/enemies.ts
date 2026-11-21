@@ -156,6 +156,14 @@ export const ENEMIES: Record<string, EnemyDef> = {
     aimLead: 0,
     art: { gun: 'turret-laser' },
   },
+  dummy: {
+    id: 'dummy',
+    name: 'Practice target',
+    kind: 'structure',
+    hp: 90,
+    radius: 32,
+    detectRange: 0,
+  },
   truck: {
     id: 'truck',
     name: 'Cargo truck',

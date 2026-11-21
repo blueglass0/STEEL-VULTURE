@@ -1,7 +1,7 @@
 import type { Obstacle } from '../../core/collision';
 import { Rng } from '../../core/rng';
 import type { Vec } from '../../core/math';
-import { DEFEND, DESTROY_TARGETS, ESCORT, HUNT, MAP_SIZES, RAID, type MapSize, type MissionType } from '../../data/missions';
+import { DEFEND, DESTROY_TARGETS, ESCORT, HUNT, MAP_SIZES, RAID, TUTORIAL, type MapSize, type MissionType } from '../../data/missions';
 import type { CombatDifficulty } from '../../data/difficulty';
 import { ECONOMY } from '../../data/economy';
 
@@ -85,7 +85,39 @@ export function generateDestroyTargets(
  * they differ in what sits at the sites (uplinks, outposts) and in mission extras
  * (the hunted ace, the convoy road). Large maps scale obstacle counts with the area.
  */
+/** The tutorial's small hand-laid map: a clear corridor north, some cover at the sides. */
+function tutorialMap(seed: number): MissionMap {
+  const T = TUTORIAL;
+  const obstacles: Obstacle[] = [
+    { kind: 'circle', x: 520, y: 1640, r: 60, type: 'rock' },
+    { kind: 'circle', x: 1480, y: 1660, r: 70, type: 'rock' },
+    { kind: 'circle', x: 1560, y: 1330, r: 45, type: 'rock' },
+    { kind: 'rect', x: 240, y: 640, w: 40, h: 440, type: 'wall' },
+    { kind: 'rect', x: 1380, y: 560, w: 220, h: 160, type: 'building' },
+    { kind: 'rect', x: 1420, y: 880, w: 120, h: 90, type: 'lightBuilding' },
+    { kind: 'rect', x: 890, y: 690, w: 60, h: 18, type: 'sandbags' },
+    { kind: 'rect', x: 1060, y: 690, w: 60, h: 18, type: 'sandbags' },
+  ];
+  for (const [x, y] of [[430, 360], [470, 410], [400, 440], [520, 330], [560, 400], [480, 300]]) obstacles.push({ kind: 'circle', x, y, r: 18, type: 'tree' });
+  for (let i = 0; i < 6; i++) obstacles.push({ kind: 'rect', x: 1200 + i * 50, y: 1500, w: 46, h: 8, type: 'fence' });
+  return {
+    seed,
+    width: T.size,
+    height: T.size,
+    obstacles,
+    spawn: { x: T.spawn.x, y: T.spawn.y, angle: -Math.PI / 2 },
+    targets: [],
+    turrets: [],
+    tanks: [],
+    units: [],
+    stations: [{ type: 'repair', x: T.station.x, y: T.station.y }],
+    mission: 'tutorial',
+    sites: [],
+  };
+}
+
 export function generateMap(seed: number, difficulty: CombatDifficulty, opts: MapOptions): MissionMap {
+  if (opts.mission === 'tutorial') return tutorialMap(seed);
   const T = DESTROY_TARGETS;
   const M = T.map;
   const forces = opts.forces;
@@ -135,7 +167,7 @@ export function generateMap(seed: number, difficulty: CombatDifficulty, opts: Ma
 
   // Sites (uplink bases or outposts): far from the drop point and from each other. Escort
   // ambushes sit beside the road instead; defend missions have none.
-  const siteCount = { destroy: opts.targets, hunt: HUNT.outposts, raid: RAID.outposts, defend: 0, escort: 0 }[opts.mission];
+  const siteCount = { destroy: opts.targets, hunt: HUNT.outposts, raid: RAID.outposts, defend: 0, escort: 0, tutorial: 0 }[opts.mission];
   const sites: Vec[] = [];
   if (opts.mission === 'escort' && convoy) {
     const { start, end } = convoy;
