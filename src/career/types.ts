@@ -65,7 +65,8 @@ export interface LoanState {
 }
 
 export interface CareerState {
-  version: 1;
+  /** Save format version (`SAVE_VERSION` in career.ts); older saves are upgraded step by step on load. */
+  version: number;
   money: number;
   loan: LoanState | null;
   /** The hangar: every mech the player owns. */

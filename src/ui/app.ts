@@ -11,7 +11,7 @@ import { isEquipment, isWeapon, itemName } from '../data/items';
 import { fitsMount, mechStats } from '../game/mechStats';
 import { SECTIONS } from '../game/units/SectionDamage';
 import { play, setMuted, setVolume } from '../core/audio';
-import { settings, saveSettings, type ControlScheme, type TouchFire } from '../core/settings';
+import { BUTTON_SCALE, settings, saveSettings, type ControlScheme, type TouchFire } from '../core/settings';
 import { refreshViewport } from '../core/viewport';
 import { clockTime, h, money, signedMoney } from './h';
 import type { MapScene } from '../scenes/MapScene';
@@ -1058,7 +1058,7 @@ export class App {
             TOUCH_FIRE_HELP[settings.touchFire],
             seg<TouchFire>([['tiers', 'Ring + edge'], ['swap', 'Swap button'], ['both', 'All weapons']], settings.touchFire, (v) => (settings.touchFire = v)),
           ),
-          field('Phone button size', '', slider(80, 130, Math.round(settings.buttonScale * 100), (v) => (settings.buttonScale = v / 100), (v) => `${v}%`)),
+          field('Phone button size', '', slider(BUTTON_SCALE.min * 100, BUTTON_SCALE.max * 100, Math.round(settings.buttonScale * 100), (v) => (settings.buttonScale = v / 100), (v) => `${v}%`)),
         ),
       ];
       panel.replaceChildren(...groups.filter((g): g is HTMLElement => !!g));
