@@ -63,6 +63,11 @@ export function mountDomUi(game: Phaser.Game, container: HTMLElement, app: App):
     muteBtn.textContent = settings.muted ? '🔇' : '🔊';
   });
   muteBtn.textContent = settings.muted ? '🔇' : '🔊';
+  // Settings can mute too: keep the icon in step.
+  setInterval(() => {
+    const icon = settings.muted ? '🔇' : '🔊';
+    if (muteBtn.textContent !== icon) muteBtn.textContent = icon;
+  }, 300);
   muteBtn.title = 'Sound on/off';
   muteBtn.classList.add('icon');
 

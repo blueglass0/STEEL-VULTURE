@@ -80,11 +80,6 @@ export function generateDestroyTargets(
   return generateMap(seed, difficulty, { mission: 'destroy', targets: targetCount, forces, size: 'standard' });
 }
 
-/**
- * Generate a mission map from a seed. Every mission type shares the terrain generator;
- * they differ in what sits at the sites (uplinks, outposts) and in mission extras
- * (the hunted ace, the convoy road). Large maps scale obstacle counts with the area.
- */
 /** The tutorial's small hand-laid map: a clear corridor north, some cover at the sides. */
 function tutorialMap(seed: number): MissionMap {
   const T = TUTORIAL;
@@ -116,6 +111,11 @@ function tutorialMap(seed: number): MissionMap {
   };
 }
 
+/**
+ * Generate a mission map from a seed. Every mission type shares the terrain generator;
+ * they differ in what sits at the sites (uplinks, outposts) and in mission extras
+ * (the hunted ace, the convoy road). Large maps scale obstacle counts with the area.
+ */
 export function generateMap(seed: number, difficulty: CombatDifficulty, opts: MapOptions): MissionMap {
   if (opts.mission === 'tutorial') return tutorialMap(seed);
   const T = DESTROY_TARGETS;

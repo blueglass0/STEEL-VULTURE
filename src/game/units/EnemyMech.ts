@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { DEG, wrapAngle, type Vec } from '../../core/math';
-import { play } from '../../core/audio';
+import { play, stepPitch } from '../../core/audio';
 import { CHASSIS, type Section } from '../../data/chassis';
 import type { EnemyDef, EnemyMechDef } from '../../data/enemies';
 import type { MechState } from '../../career/types';
@@ -196,7 +196,7 @@ export class EnemyMech extends Enemy {
     const oy = this.y;
     // Footsteps carry: you can hear a heavy mech you can't see.
     if (mech.update(dt, input, ctx.world, ctx.bodies, ctx.combat) && Math.abs(mech.motor.speed) > 20) {
-      play('step', ctx.combat.volumeAt(this.x, this.y) * 0.35, Math.max(0.65, Math.min(1.4, Math.sqrt(50 / mech.chassis.tonnage))));
+      play('step', ctx.combat.volumeAt(this.x, this.y) * 0.35, stepPitch(mech.chassis.tonnage));
     }
     this.x = mech.x;
     this.y = mech.y;

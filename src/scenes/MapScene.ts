@@ -9,7 +9,7 @@ import { settings } from '../core/settings';
 import { CollisionWorld, type Circle } from '../core/collision';
 import { DEG, clamp, smoothing, wrapAngle, type Vec } from '../core/math';
 import { randomSeed } from '../core/rng';
-import { play, startAmbience, stopAmbience } from '../core/audio';
+import { play, startAmbience, stepPitch, stopAmbience } from '../core/audio';
 import { DEBUG, debugInfo } from '../core/debug';
 import type { Section } from '../data/chassis';
 import { DAMAGE_RULES } from '../data/damage';
@@ -130,6 +130,9 @@ export class MapScene extends Phaser.Scene {
     this.fog = undefined;
     this.evac = null;
     this.evacImg = undefined;
+    // Images from the last run were destroyed with the old scene: never reuse them.
+    this.tutRing = undefined;
+    this.pingImg = undefined;
     this.briefingUntil = 4.5;
     this.state = 'active';
     this.endTimer = this.elapsed = this.kills = this.hits = this.damageDealt = 0;
@@ -1420,9 +1423,4 @@ function pickByWeight(items: readonly { type: string; weight: number }[]): strin
   let r = Math.random() * items.reduce((t, i) => t + i.weight, 0);
   for (const i of items) if ((r -= i.weight) <= 0) return i.type;
   return items[0].type;
-}
-
-/** Footstep pitch by weight: heavy mechs thud lower. */
-export function stepPitch(tonnage: number): number {
-  return Math.max(0.65, Math.min(1.4, Math.sqrt(50 / tonnage)));
 }

@@ -217,6 +217,11 @@ export function play(id: SoundId, volume = 1, rate = 1): void {
   }
 }
 
+/** Footstep pitch by weight: heavy mechs thud lower. */
+export function stepPitch(tonnage: number): number {
+  return Math.max(0.65, Math.min(1.4, Math.sqrt(50 / tonnage)));
+}
+
 /** Low rumble under a mission: looped noise through a low-pass filter. */
 let ambience: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
 

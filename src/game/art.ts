@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { DAMAGE_RULES as DAMAGE_ARCS } from '../data/damage';
+import { CONTROLS } from '../config/controls';
 
 /**
  * Vector art, drawn once into textures at boot. Textures are baked at
@@ -182,7 +183,7 @@ export function bakeArt(scene: Phaser.Scene): void {
     160,
     (g) => {
       g.lineStyle(2, 0x7fe6ff, 0.55);
-      const r = 58 * 1.15;
+      const r = CONTROLS.stickRadius * CONTROLS.bothGroupsAt;
       for (let i = 0; i < 24; i++) {
         const a0 = (i / 24) * Math.PI * 2;
         const a1 = a0 + (Math.PI * 2) / 24 / 2;
