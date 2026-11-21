@@ -11,6 +11,7 @@ import { isEquipment, isWeapon, itemName } from '../data/items';
 import { fitsMount, mechStats } from '../game/mechStats';
 import { SECTIONS } from '../game/units/SectionDamage';
 import { play, setMuted, setVolume } from '../core/audio';
+import { installMode, onInstallChange, promptInstall } from '../pwa/pwa';
 import { BUTTON_SCALE, settings, saveSettings, type ControlScheme, type TouchFire } from '../core/settings';
 import { refreshViewport } from '../core/viewport';
 import { clockTime, h, money, signedMoney } from './h';
@@ -122,6 +123,25 @@ export class App {
         'Start career',
       ),
     );
+    // Install as an app: a real dialog where the browser offers one, instructions on iPhone/iPad.
+    const iosHint = h('p', { class: 'muted install-hint', hidden: true }, 'In Safari, tap Share, then Add to Home Screen. The game then works offline.');
+    const install = h(
+      'button',
+      {
+        class: 'link',
+        onclick: () => {
+          if (installMode() === 'ios') iosHint.hidden = !iosHint.hidden;
+          else void promptInstall();
+        },
+      },
+      'Install app',
+    );
+    const updateInstall = () => {
+      install.hidden = !installMode();
+      if (!installMode()) iosHint.hidden = true;
+    };
+    updateInstall();
+    onInstallChange(updateInstall);
     this.show(
       h(
         'div',
@@ -133,7 +153,9 @@ export class App {
           { class: 'title-links' },
           h('button', { class: 'link', onclick: () => this.startTutorial() }, 'Tutorial (2 min)'),
           h('button', { class: 'link', onclick: () => this.openSettings() }, 'Settings'),
+          install,
         ),
+        iosHint,
         c && !c.over
           ? h(
               'div',
