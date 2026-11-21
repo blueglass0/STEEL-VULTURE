@@ -12,6 +12,7 @@ import {
   newCareer,
   refreshContracts,
   saveCareer,
+  saveUnreadable,
   shopStatus,
   upgradeSave,
 } from '../src/career/career';
@@ -133,6 +134,13 @@ describe('save upgrades', () => {
     for (const bad of [null, 'text', 3, {}, { version: 0 }, { version: '2' }, { version: 2, mechs: [] }]) expect(upgradeSave(bad)).toBeNull();
     localStorage.setItem(SAVE_KEY, '{not json');
     expect(loadCareer()).toBeNull();
+    expect(saveUnreadable).toBe(true);
+    localStorage.setItem(SAVE_KEY, JSON.stringify(s));
+    expect(loadCareer()).toBeNull();
+    expect(saveUnreadable).toBe(true);
+    localStorage.removeItem(SAVE_KEY);
+    expect(loadCareer()).toBeNull();
+    expect(saveUnreadable).toBe(false);
   });
 });
 

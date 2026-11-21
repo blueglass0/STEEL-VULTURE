@@ -102,12 +102,20 @@ function repairCareer(s: CareerState): void {
   s.inventory = s.inventory.filter((id) => WEAPONS[id] || EQUIPMENT[id]);
 }
 
+/** Set by `loadCareer`: a save exists but couldn't be read (corrupt, or from a newer version). */
+export let saveUnreadable = false;
+
 export function loadCareer(): CareerState | null {
+  saveUnreadable = false;
+  let raw: string | null = null;
   try {
-    const raw = localStorage.getItem(SAVE_KEY);
+    raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    return upgradeSave(JSON.parse(raw));
+    const s = upgradeSave(JSON.parse(raw));
+    saveUnreadable = s === null;
+    return s;
   } catch {
+    saveUnreadable = raw !== null;
     return null;
   }
 }

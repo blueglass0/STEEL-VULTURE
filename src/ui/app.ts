@@ -101,6 +101,9 @@ export class App {
       'div',
       { class: 'panel new-career', hidden: !!c && !c.over },
       h('h3', null, 'New career'),
+      !c && C.saveUnreadable
+        ? h('p', { class: 'warn' }, "Your saved career couldn't be loaded. It may be from a newer version of the game: try reloading the page. Starting a new career replaces it.")
+        : null,
       picker('Combat', 'enemy numbers, accuracy and damage', () => combat, (l) => (combat = l)),
       picker('Economy', 'costs, payouts, loans, bankruptcy', () => economy, (l) => (economy = l)),
       h(
@@ -109,6 +112,7 @@ export class App {
           class: 'primary big',
           onclick: () => {
             if (c && !c.over && !confirm('Start a new career? Your current career will be lost.')) return;
+            if (!c && C.saveUnreadable && !confirm('Replace the saved career that could not be loaded?')) return;
             this.career = C.newCareer(combat, economy);
             this.save();
             this.tab = 'contracts';
