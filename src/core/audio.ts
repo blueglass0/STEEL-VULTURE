@@ -6,14 +6,61 @@
  */
 import { settings, saveSettings } from './settings';
 
-export type SoundId = 'mg' | 'cannon' | 'heavy' | 'laser' | 'pulse' | 'beam' | 'plasma' | 'zap' | 'missile' | 'flare' | 'shield' | 'lock' | 'crunch' | 'collapse' | 'hit' | 'explode' | 'bigExplode' | 'warn' | 'ui';
+export type SoundId =
+  | 'mg'
+  | 'cannon'
+  | 'heavy'
+  | 'laser'
+  | 'pulse'
+  | 'beam'
+  | 'plasma'
+  | 'zap'
+  | 'missile'
+  | 'flare'
+  | 'shield'
+  | 'lock'
+  | 'crunch'
+  | 'collapse'
+  | 'hit'
+  | 'explode'
+  | 'bigExplode'
+  | 'warn'
+  | 'ui'
+  | 'step'
+  | 'hurt'
+  | 'powerDown'
+  | 'powerUp'
+  | 'repair'
+  | 'win'
+  | 'lose';
+
+/** Sounds that get a little random pitch each time, so repeats don't sound identical. */
+const VARIED: Partial<Record<SoundId, number>> = { explode: 0.25, bigExplode: 0.2, hit: 0.3, cannon: 0.15, heavy: 0.12, crunch: 0.3, step: 0.1, hurt: 0.2, mg: 0.1 };
+/** Pitch multiplier for the sound being built (frequencies scale with it). */
+let pitch = 1;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
 let noise: AudioBuffer | null = null;
 /** Last play time per sound, to stop rapid-fire weapons stacking into noise. */
 const last: Partial<Record<SoundId, number>> = {};
-const MIN_GAP: Partial<Record<SoundId, number>> = { mg: 0.045, hit: 0.05, cannon: 0.04, warn: 0.3, missile: 0.08, lock: 0.25, crunch: 0.06, collapse: 0.15, beam: 0.1, pulse: 0.06, zap: 0.08 };
+const MIN_GAP: Partial<Record<SoundId, number>> = {
+  mg: 0.045,
+  hit: 0.05,
+  cannon: 0.04,
+  warn: 0.3,
+  missile: 0.08,
+  lock: 0.25,
+  crunch: 0.06,
+  collapse: 0.15,
+  beam: 0.1,
+  pulse: 0.06,
+  zap: 0.08,
+  step: 0.07,
+  hurt: 0.12,
+  win: 1,
+  lose: 1,
+};
 
 function init(): void {
   if (ctx) return;
@@ -54,15 +101,49 @@ function masterGain(): number {
   return settings.muted ? 0 : 0.45 * settings.volume;
 }
 
-/** Play a sound at a volume of 0..1 (callers scale by distance). */
-export function play(id: SoundId, volume = 1): void {
+/**
+ * Play a sound at a volume of 0..1 (callers scale by distance). `rate` shifts its pitch
+ * (footsteps: heavier mechs lower); some sounds also vary a little on their own.
+ */
+export function play(id: SoundId, volume = 1, rate = 1): void {
   if (!ctx || !master || !noise || settings.muted || volume <= 0.02 || ctx.state !== 'running') return;
   const now = ctx.currentTime;
   const gap = MIN_GAP[id] ?? 0.02;
   if ((last[id] ?? -1) > now - gap) return;
   last[id] = now;
   const v = Math.min(1, volume);
+  const vary = VARIED[id] ?? 0;
+  pitch = rate * (1 + (Math.random() * 2 - 1) * vary * 0.5);
   switch (id) {
+    case 'step':
+      // A heavy foot landing: low thud plus a short rumble.
+      burst(now, 0.1, 220, 'lowpass', 0.55 * v);
+      tone(now, 'sine', 80, 38, 0.11, 0.4 * v);
+      break;
+    case 'hurt':
+      // Hit on your own mech: a muffled clang through the cockpit.
+      burst(now, 0.14, 420, 'lowpass', 0.7 * v);
+      tone(now, 'square', 190, 70, 0.12, 0.1 * v);
+      tone(now, 'triangle', 1300, 900, 0.06, 0.05 * v);
+      break;
+    case 'powerDown':
+      tone(now, 'sawtooth', 420, 55, 0.7, 0.13 * v);
+      tone(now, 'sine', 210, 35, 0.8, 0.22 * v);
+      break;
+    case 'powerUp':
+      tone(now, 'sawtooth', 70, 380, 0.45, 0.1 * v);
+      tone(now, 'sine', 140, 520, 0.4, 0.12 * v);
+      break;
+    case 'repair':
+      tone(now, 'triangle', 320, 960, 0.5, 0.14 * v);
+      burst(now, 0.4, 2600, 'bandpass', 0.12 * v, 2);
+      break;
+    case 'win':
+      [523, 659, 784, 1047].forEach((f, i) => tone(now + i * 0.11, 'triangle', f, f, 0.22, 0.16 * v));
+      break;
+    case 'lose':
+      [392, 311, 233].forEach((f, i) => tone(now + i * 0.18, 'square', f, f * 0.97, 0.3, 0.07 * v));
+      break;
     case 'mg':
       burst(now, 0.05, 2500, 'bandpass', 0.35 * v, 1.2);
       break;
@@ -136,13 +217,40 @@ export function play(id: SoundId, volume = 1): void {
   }
 }
 
+/** Low rumble under a mission: looped noise through a low-pass filter. */
+let ambience: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+
+export function startAmbience(): void {
+  if (!ctx || !master || !noise || ambience) return;
+  const src = ctx.createBufferSource();
+  src.buffer = noise;
+  src.loop = true;
+  const f = ctx.createBiquadFilter();
+  f.type = 'lowpass';
+  f.frequency.value = 160;
+  const gain = ctx.createGain();
+  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.06, ctx.currentTime + 2);
+  src.connect(f).connect(gain).connect(master);
+  src.start();
+  ambience = { src, gain };
+}
+
+export function stopAmbience(): void {
+  if (!ctx || !ambience) return;
+  const a = ambience;
+  ambience = null;
+  a.gain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.3);
+  a.src.stop(ctx.currentTime + 1.5);
+}
+
 function burst(t: number, dur: number, freq: number, type: BiquadFilterType, gain: number, q = 0.7): void {
   const c = ctx!;
   const src = c.createBufferSource();
   src.buffer = noise;
   const f = c.createBiquadFilter();
   f.type = type;
-  f.frequency.value = freq;
+  f.frequency.value = freq * pitch;
   f.Q.value = q;
   const g = c.createGain();
   g.gain.setValueAtTime(gain, t);
@@ -155,8 +263,8 @@ function tone(t: number, type: OscillatorType, f0: number, f1: number, dur: numb
   const c = ctx!;
   const o = c.createOscillator();
   o.type = type;
-  o.frequency.setValueAtTime(f0, t);
-  o.frequency.exponentialRampToValueAtTime(Math.max(20, f1), t + dur);
+  o.frequency.setValueAtTime(f0 * pitch, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(20, f1 * pitch), t + dur);
   const g = c.createGain();
   g.gain.setValueAtTime(gain, t);
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);

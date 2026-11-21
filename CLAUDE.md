@@ -4,9 +4,10 @@ Top-down real-time mech game. Full design and milestone plan: `docs/PLAN.md`. Re
 
 ## Current milestone
 
-**Milestone 11 part 1 — Settings menu, phone controls rework, quality options: built,
-awaiting the user's playtest.** M1–M10 played (defend/escort still being tuned by the user).
-Next: M11 part 2 (tutorial and sound pass), then the optional extras.
+**Milestone 11 (both parts) — settings, phone controls rework, quality options, tutorial,
+sound pass: built, awaiting the user's playtest** (the user will merge and test everything at
+once). M1–M10 played (defend/escort still being tuned). The plan's milestones are done except
+the optional 12 (final mission, maybe someday); next steps come from playtest feedback.
 Deferred by the user: line-of-sight shadow rendering (logic already hides enemies behind
 walls); revisit as a graphics option, likely in M11.
 Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back into `src/data/`.
@@ -397,6 +398,25 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
 - Phone buttons sit on an arc around the right stick (`CONTROLS.buttonArc`, `buttonSlots`,
   `interactSlot`), scaled by `buttonScale`; swap first in swap mode, then flares, shield; USE
   lower-left. HUD draws the dashed outer ring in tiers mode and an fps readout when enabled.
+
+## Tutorial and sound notes (M11 part 2)
+
+- Tutorial (`MissionType` 'tutorial', weight 0 so contracts never roll it; `TUTORIAL` in
+  data/missions.ts): a hand-laid 2000² map (`tutorialMap` in mapgen) and six steps driven by
+  `MapScene.updateTutorial`/`enterTutorialStep`: walk to a marker, destroy a practice target
+  (`dummy`) with group 1, another with group 2 (heat), repair at a free pad after scripted damage,
+  kill one light tank (enemy damage ×0.3), evac. `tutorialText()` words each prompt for the
+  device, movement scheme and phone firing mode. Launched from the title screen ("Tutorial (2
+  min)") or a card on the contract board while the career has no missions and
+  `settings.tutorialSeen` is false (`App.startTutorial`): a loaner Vulture, zero field prices,
+  nothing touches the career; the end screen returns to the hangar or title.
+- Station prompts now decide "nothing to do" from need, not cost (free pads say "free").
+- Sound (`core/audio.ts`): `play(id, volume, rate)`; `VARIED` sounds get random pitch.
+  New: footsteps for the player and enemy mechs (`stepPitch(tonnage)`: heavier = lower),
+  `hurt` when the player takes damage, `powerDown`/`powerUp` on overheat shutdown and restart,
+  `repair` at a repair pad, `win`/`lose` stings, and a quiet low-passed noise ambience during
+  missions (`startAmbience`/`stopAmbience`).
+- Test scripts must click `.card:not(.tutorial)`: in a fresh browser the tutorial card is first.
 
 ## Conventions
 

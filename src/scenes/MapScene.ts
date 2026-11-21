@@ -2,14 +2,14 @@ import Phaser from 'phaser';
 import { DISPLAY } from '../config/display';
 import { CAMERA } from '../config/controls';
 import { CHASSIS, STARTER_CHASSIS, type ChassisMovement } from '../data/chassis';
-import { DEFEND, DESTROY_TARGETS, ESCORT, HUNT, MISSION_THEME, RAID, type MissionType } from '../data/missions';
+import { DEFEND, DESTROY_TARGETS, ESCORT, HUNT, MISSION_THEME, RAID, TUTORIAL, type MissionType } from '../data/missions';
 import { Viewport } from '../core/viewport';
 import { InputSystem, actions, touchButtons } from '../core/input';
 import { settings } from '../core/settings';
 import { CollisionWorld, type Circle } from '../core/collision';
 import { DEG, clamp, smoothing, wrapAngle, type Vec } from '../core/math';
 import { randomSeed } from '../core/rng';
-import { play } from '../core/audio';
+import { play, startAmbience, stopAmbience } from '../core/audio';
 import { DEBUG, debugInfo } from '../core/debug';
 import type { Section } from '../data/chassis';
 import { DAMAGE_RULES } from '../data/damage';
@@ -204,10 +204,12 @@ export class MapScene extends Phaser.Scene {
     this.scale.on(Phaser.Scale.Events.RESIZE, this.fitCamera, this);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.scale.off(Phaser.Scale.Events.RESIZE, this.fitCamera, this);
+      stopAmbience();
     });
+    startAmbience();
 
     hud.state = 'active';
-    hud.objectiveLabel = { hunt: `Hunt "${cfg.contract.aceName}"`, raid: 'Destroy convoy trucks', destroy: 'Destroy uplinks', defend: 'Defend · generators', escort: 'Escort · trucks across' }[this.mission];
+    hud.objectiveLabel = { hunt: `Hunt "${cfg.contract.aceName}"`, raid: 'Destroy convoy trucks', destroy: 'Destroy uplinks', defend: 'Defend · generators', escort: 'Escort · trucks across', tutorial: 'Tutorial' }[this.mission];
     hud.objectiveTotal = this.mission === 'defend' ? this.friendlies.length : this.required;
     hud.objectiveDone = this.mission === 'defend' ? this.friendlies.length : 0;
     hud.briefing = {
@@ -216,6 +218,7 @@ export class MapScene extends Phaser.Scene {
       destroy: DESTROY_TARGETS.briefing(this.required),
       defend: `Defend the generators: ${this.wavesTotal} attack waves inbound. First in ${DEFEND.firstWave}s.`,
       escort: `Escort the convoy: ${this.required} of ${this.friendlies.length} trucks must get across. They only move while you're close.`,
+      tutorial: '',
     }[this.mission];
     hud.bonusLabel = cfg.contract.bonus.label;
     hud.bonusState = 'open';
@@ -267,8 +270,9 @@ export class MapScene extends Phaser.Scene {
       this.bodies,
       this.combat,
     );
-    if (stepped && this.movement.stepShake > 0 && Math.abs(p.motor.speed) > 20) {
-      this.shake(90, this.movement.stepShake);
+    if (stepped && Math.abs(p.motor.speed) > 20) {
+      if (this.movement.stepShake > 0) this.shake(90, this.movement.stepShake);
+      play('step', 0.4, stepPitch(p.chassis.tonnage));
     }
 
     for (const e of this.enemies) e.update(dt, this.ai);
@@ -476,9 +480,112 @@ export class MapScene extends Phaser.Scene {
       this.friendlies.push(...trucks);
       this.objectives = [];
       this.required = escortRequired(n);
+    } else if (this.mission === 'tutorial') {
+      this.objectives = [];
+      this.required = 0;
+      this.tut = { step: -1, target: null, marker: null };
     } else {
       this.objectives = this.structures;
       this.required = this.structures.length;
+    }
+  }
+
+  // --- Tutorial (milestone 11): six short steps on a small map ---
+
+  private tut: { step: number; target: Enemy | null; marker: Vec | null } = { step: -1, target: null, marker: null };
+  private tutRing?: Phaser.GameObjects.Image;
+
+  private updateTutorial(): void {
+    const t = this.tut;
+    const p = this.player;
+    const T = TUTORIAL;
+    let next = t.step < 0;
+    switch (t.step) {
+      case 0:
+        next = Math.hypot(p.x - T.waypoint.x, p.y - T.waypoint.y) < 90;
+        break;
+      case 1:
+      case 2:
+      case 4:
+        next = !t.target?.alive;
+        break;
+      case 3:
+        next = !!this.stations[0]?.used;
+        break;
+    }
+    if (next) {
+      t.step++;
+      this.enterTutorialStep();
+    }
+    hud.briefing = this.tutorialText();
+    this.briefingUntil = this.elapsed + 1;
+    hud.objectiveLabel = `Tutorial · step ${Math.min(t.step + 1, 6)} of 6`;
+    hud.objectiveTotal = 0;
+  }
+
+  private enterTutorialStep(): void {
+    const t = this.tut;
+    const T = TUTORIAL;
+    const spawn = (type: string, at: Vec, angle: number) => {
+      const e = createEnemy(this, type, at.x, at.y, angle);
+      this.enemies.push(e);
+      this.units.push(e);
+      if (e instanceof Structure) this.structures.push(e);
+      this.rebuildBodies();
+      return e;
+    };
+    this.tutRing ??= this.add.image(0, 0, 'intel-ping').setScale(1 / ART_SCALE).setDepth(2);
+    this.tutRing.setVisible(false);
+    t.marker = null;
+    play('ui', 0.8);
+    switch (t.step) {
+      case 0:
+        t.marker = T.waypoint;
+        this.tutRing.setPosition(T.waypoint.x, T.waypoint.y).setVisible(true);
+        break;
+      case 1:
+        t.target = spawn('dummy', T.targetA, 0);
+        break;
+      case 2:
+        t.target = spawn('dummy', T.targetB, 0);
+        break;
+      case 3:
+        // Some damage to fix at the repair pad.
+        this.player.damageSection('leftArm', 70);
+        this.player.damageSection('torso', 60);
+        t.marker = T.station;
+        break;
+      case 4:
+        t.target = spawn('lightTank', T.tank, Math.PI / 2);
+        break;
+      case 5:
+        this.openEvac();
+        break;
+    }
+  }
+
+  /** The current step's instruction, worded for the device and control settings in use. */
+  private tutorialText(): string {
+    const touch = actions.device === 'touch';
+    const tank = settings.scheme[actions.device] === 'tank';
+    const fire = settings.touchFire;
+    switch (this.tut.step) {
+      case 0:
+        if (touch) return 'Walk to the marker with the left stick. The right stick turns your torso.';
+        return tank ? 'Walk to the marker: W/S walk, A/D turn the legs, the mouse aims your torso.' : 'Walk to the marker: WASD walks that way, the mouse aims your torso.';
+      case 1:
+        return touch ? 'Destroy the target: push the right stick past its inner ring to fire.' : 'Destroy the target: aim with the mouse, left click fires group 1.';
+      case 2:
+        if (!touch) return 'Now right click: group 2 is your laser. Lasers run hot, so watch the heat bar.';
+        if (fire === 'tiers') return 'Drag past the dashed outer ring to fire both groups. Watch the heat bar.';
+        if (fire === 'swap') return 'Tap ⇄ to switch to group 2, then fire. Lasers run hot: watch the heat bar.';
+        return 'Your stick fires every weapon at once. Lasers run hot: watch the heat bar.';
+      case 3:
+        return `You're damaged. Stand on the repair pad and ${touch ? 'tap USE' : 'press F'}. Free here, costly in contracts.`;
+      case 4:
+        return 'A tank ahead. You only see inside your vision cone; red arcs show hits from elsewhere.';
+      default:
+        return 'Done! Walk into the green evac zone to finish.';
     }
   }
 
@@ -803,6 +910,7 @@ export class MapScene extends Phaser.Scene {
       }
     } else if (u === this.player && (counts || dmg >= 2)) {
       hud.lastHit = this.player.lastHit;
+      if (!this.player.invulnerable) play('hurt', Math.min(1, 0.35 + dmg / 30));
       // Direction marker: newest first, capped.
       hud.hitMarkers.unshift({ angle: this.player.lastHitAngle, time: this.player.lastHit });
       if (hud.hitMarkers.length > 6) hud.hitMarkers.length = 6;
@@ -856,6 +964,8 @@ export class MapScene extends Phaser.Scene {
           this.briefingUntil = this.elapsed + 5;
           play('ui', 1);
         }
+      } else if (this.mission === 'tutorial' && !this.evac) {
+        this.updateTutorial();
       } else if (done >= this.required && !this.evac) {
         this.openEvac();
       } else if (!this.evac && this.objectives.length - this.escaped < this.required) {
@@ -878,6 +988,8 @@ export class MapScene extends Phaser.Scene {
       }
       return;
     }
+    // Win / lose sting as the mission ends (not for walking away).
+    if (this.endTimer === 0 && !this.withdrew) play(this.state === 'won' ? 'win' : 'lose', 0.9);
     if (this.endTimer < END_DELAY && (this.endTimer += dt) >= END_DELAY) {
       hud.state = this.state;
       this.controls.reset();
@@ -939,13 +1051,14 @@ export class MapScene extends Phaser.Scene {
     if (st.type === 'ammo') {
       const cap = p.loadout.ammoCapacity;
       const cost = Math.round((cap.ballistic - p.ammo.ballistic) * P.ammoBallistic + (cap.missile - p.ammo.missile) * P.ammoMissile);
-      return { label: 'Resupply ammo', cost, reason: cost === 0 ? 'Ammo is full' : '' };
+      const full = p.ammo.ballistic >= cap.ballistic && p.ammo.missile >= cap.missile;
+      return { label: 'Resupply ammo', cost, reason: full ? 'Ammo is full' : '' };
     }
     if (st.type === 'repair') {
       let missing = 0;
       for (const sec of SECTIONS) if (!p.sections.destroyed(sec)) missing += p.sections.max[sec] - p.sections.hp[sec];
       const cost = Math.round(missing * P.repairPerArmor);
-      return { label: 'Patch armor', cost, reason: cost === 0 ? 'Nothing to patch (destroyed sections need the hangar)' : '' };
+      return { label: 'Patch armor', cost, reason: missing <= 0 ? 'Nothing to patch (destroyed sections need the hangar)' : '' };
     }
     const next = this.backupQueue[0];
     if (!next) return { label: 'Swap mech', cost: P.swapFee, reason: 'No backup on the ship' };
@@ -966,7 +1079,7 @@ export class MapScene extends Phaser.Scene {
     const offer = this.stationOffer(st);
     const left = this.funds - this.fieldCosts.reduce((t, f) => t + f.amount, 0);
     const reason = offer.reason || (offer.cost > left ? `Not enough money (${moneyText(left)} left)` : '');
-    hud.interactPrompt = reason ? `${offer.label}: ${reason}` : `${offer.label}  ${moneyText(offer.cost)}`;
+    hud.interactPrompt = reason ? `${offer.label}: ${reason}` : `${offer.label}  ${offer.cost > 0 ? moneyText(offer.cost) : 'free'}`;
     hud.interactReady = !reason;
     if (!pressed || reason || this.state !== 'active') return;
     this.fieldCosts.push({ label: `Field: ${offer.label}`, amount: offer.cost });
@@ -978,6 +1091,7 @@ export class MapScene extends Phaser.Scene {
     } else if (st.type === 'repair') {
       for (const sec of SECTIONS) if (!p.sections.destroyed(sec)) p.sections.hp[sec] = p.sections.max[sec];
       p.updateLegs();
+      play('repair', 1);
     } else {
       this.swapToBackup(st);
     }
@@ -1149,6 +1263,10 @@ export class MapScene extends Phaser.Scene {
     if (this.elapsed > this.briefingUntil) hud.briefing = '';
     if (this.evac) hud.targets.push(this.evac);
     else if (this.aceIntel) hud.targets.push(this.aceIntel);
+    else if (this.mission === 'tutorial') {
+      if (this.tut.marker) hud.targets.push(this.tut.marker);
+      else if (this.tut.target?.alive) hud.targets.push(this.tut.target);
+    }
     else if (this.mission === 'defend') {
       for (const g of this.friendlies) if (g.alive) hud.targets.push(g);
     } else if (this.mission === 'escort') {
@@ -1302,4 +1420,9 @@ function pickByWeight(items: readonly { type: string; weight: number }[]): strin
   let r = Math.random() * items.reduce((t, i) => t + i.weight, 0);
   for (const i of items) if ((r -= i.weight) <= 0) return i.type;
   return items[0].type;
+}
+
+/** Footstep pitch by weight: heavy mechs thud lower. */
+export function stepPitch(tonnage: number): number {
+  return Math.max(0.65, Math.min(1.4, Math.sqrt(50 / tonnage)));
 }

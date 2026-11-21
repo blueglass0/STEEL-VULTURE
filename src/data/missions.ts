@@ -53,7 +53,7 @@ export const DESTROY_TARGETS = {
   targetMinDistance: 1300,
 } as const;
 
-export type MissionType = 'destroy' | 'hunt' | 'raid' | 'defend' | 'escort';
+export type MissionType = 'destroy' | 'hunt' | 'raid' | 'defend' | 'escort' | 'tutorial';
 export type MapSize = 'standard' | 'large';
 
 /**
@@ -66,6 +66,24 @@ export const MISSION_TYPES: Record<MissionType, { name: string; weight: number; 
   raid: { name: 'Convoy raid', weight: 2.5, payMult: 1.1, noun: 'trucks' },
   defend: { name: 'Defend', weight: 2.5, payMult: 1.1, noun: 'generators' },
   escort: { name: 'Escort', weight: 2.5, payMult: 1.1, noun: 'trucks' },
+  // Never rolled for a contract: launched from the title screen or the contract board.
+  tutorial: { name: 'Tutorial', weight: 0, payMult: 0, noun: 'steps' },
+};
+
+/**
+ * The tutorial (milestone 11): a small hand-laid map and six short steps. Positions are in
+ * world units on a 2000×2000 map; the mech drops at the bottom middle facing north.
+ */
+export const TUTORIAL = {
+  size: 2000,
+  spawn: { x: 1000, y: 1820 },
+  waypoint: { x: 1000, y: 1480 },
+  targetA: { x: 1000, y: 1160 },
+  targetB: { x: 1250, y: 1260 },
+  station: { x: 690, y: 980 },
+  tank: { x: 1000, y: 520 },
+  /** Enemy damage in the tutorial (so a new pilot can't really lose). */
+  enemyDamage: 0.3,
 };
 
 /**

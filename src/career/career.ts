@@ -437,8 +437,8 @@ function makeContract(s: CareerState): Contract {
   const aceTypes = FACTIONS[enemyFaction].army.mechTypes[3];
   const ace = mission === 'hunt' ? pick(aceTypes).type : undefined;
   const aceName = mission === 'hunt' ? pick(HUNT.callsigns) : undefined;
-  const targets = { destroy: t.targets, hunt: 1, raid: RAID.trucks[tier], defend: DEFEND.generators, escort: ESCORT.trucks[tier] }[mission];
-  const flavors = { destroy: CONTRACT_FLAVOR, hunt: HUNT_FLAVOR, raid: RAID_FLAVOR, defend: DEFEND_FLAVOR, escort: ESCORT_FLAVOR }[mission];
+  const targets = { destroy: t.targets, hunt: 1, raid: RAID.trucks[tier], defend: DEFEND.generators, escort: ESCORT.trucks[tier], tutorial: 0 }[mission];
+  const flavors = { destroy: CONTRACT_FLAVOR, hunt: HUNT_FLAVOR, raid: RAID_FLAVOR, defend: DEFEND_FLAVOR, escort: ESCORT_FLAVOR, tutorial: CONTRACT_FLAVOR }[mission];
   const limited = Math.random() < ECONOMY.tonnageLimitChance;
   const maxTonnage = limited ? pick(ECONOMY.tonnageLimits) : undefined;
   const base = (t.payout[0] + Math.random() * (t.payout[1] - t.payout[0])) * econ(s).payouts;

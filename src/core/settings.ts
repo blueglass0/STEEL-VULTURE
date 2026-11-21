@@ -29,6 +29,8 @@ export interface Settings {
   touchFire: TouchFire;
   /** Size of the phone buttons around the right stick (0.8..1.3). */
   buttonScale: number;
+  /** Finished (or skipped out of) the tutorial once: stop suggesting it on the contract board. */
+  tutorialSeen: boolean;
 }
 
 const KEY = 'steel-vulture.settings.v1';
@@ -44,6 +46,7 @@ function defaults(): Settings {
     showFps: false,
     touchFire: 'tiers',
     buttonScale: 1,
+    tutorialSeen: false,
   };
 }
 

@@ -1,9 +1,9 @@
 import type Phaser from 'phaser';
 import * as C from '../career/career';
-import type { CareerState, CombatLevel, Contract, Debrief, MissionOutcome } from '../career/types';
+import type { CareerState, CombatLevel, Contract, Debrief, MissionConfig, MissionOutcome } from '../career/types';
 import { CHASSIS, CHASSIS_ORDER, type MountDef, type MountKind, type Section } from '../data/chassis';
 import { ECONOMY, SHOP_STOCK } from '../data/economy';
-import { MISSION_TYPES } from '../data/missions';
+import { MISSION_TYPES, TUTORIAL } from '../data/missions';
 import { FACTIONS, FACTION_ORDER, REPUTATION, type FactionId } from '../data/factions';
 import { WEAPONS, type WeaponDef } from '../data/weapons';
 import { EQUIPMENT, type EquipmentDef } from '../data/equipment';
@@ -124,7 +124,12 @@ export class App {
         { class: 'title' },
         h('h1', null, 'Steel Vulture'),
         h('p', { class: 'muted' }, 'Mercenary mech pilot. Take contracts, keep your mech running, stay out of debt.'),
-        h('button', { class: 'link', onclick: () => this.openSettings() }, 'Settings'),
+        h(
+          'div',
+          { class: 'title-links' },
+          h('button', { class: 'link', onclick: () => this.startTutorial() }, 'Tutorial (2 min)'),
+          h('button', { class: 'link', onclick: () => this.openSettings() }, 'Settings'),
+        ),
         c && !c.over
           ? h(
               'div',
@@ -193,9 +198,21 @@ export class App {
       if (contract) return this.deployPanel(c, contract);
       this.selectedContract = null;
     }
+    // New pilots: the tutorial sits first on the board until it's been played.
+    const tutorialCard =
+      c.stats.missions === 0 && !settings.tutorialSeen
+        ? h(
+            'button',
+            { type: 'button', class: 'card tutorial', onclick: () => this.startTutorial() },
+            h('div', { class: 'card-top' }, h('span', { class: 'tier' }, 'Training · free'), h('span', { class: 'pay' }, '2 min')),
+            h('div', { class: 'card-title' }, 'New pilot? Run the tutorial'),
+            h('div', { class: 'muted small' }, 'Walk, shoot, manage heat, repair, fight a tank, evac. A loaner mech: nothing costs you anything.'),
+          )
+        : null;
     return h(
       'div',
       { class: 'cards' },
+      tutorialCard,
       c.contracts.map((k) =>
         h(
           'button',
@@ -365,6 +382,35 @@ export class App {
 
   private startQuickMission(): void {
     this.startMission({});
+  }
+
+  /** The tutorial: a free loaner Vulture on a small map. Nothing carries over to the career. */
+  private tutorialRunning = false;
+  startTutorial(): void {
+    const loaner = C.newCareer('normal', 'normal');
+    const contract: Contract = {
+      ...loaner.contracts[0],
+      mission: 'tutorial',
+      mapSize: 'standard',
+      targets: 0,
+      enemyMechs: [],
+      droneFlights: 0,
+      maxTonnage: undefined,
+      bonus: { kind: 'intact', label: '' },
+    };
+    const config: MissionConfig = {
+      contract,
+      mech: loaner.mechs[0],
+      backups: [],
+      funds: 1e9,
+      fieldPrices: { repairPerArmor: 0, ammoBallistic: 0, ammoMissile: 0, swapFee: 0 },
+      enemyCount: 1,
+      enemySpread: 1.3,
+      enemyDamage: TUTORIAL.enemyDamage,
+    };
+    this.tutorialRunning = true;
+    play('ui', 1);
+    this.startMission(config);
   }
 
   // ---------- Mech ----------
@@ -767,6 +813,12 @@ export class App {
     this.inMission = false;
     this.game.scene.stop('Map');
     this.game.scene.stop('Hud');
+    if (this.tutorialRunning) {
+      this.tutorialRunning = false;
+      settings.tutorialSeen = true;
+      saveSettings();
+      return this.showTutorialEnd(o.won);
+    }
     if (this.quick || !this.career) {
       this.startQuickMission();
       return;
@@ -776,6 +828,24 @@ export class App {
     const d = C.completeMission(this.career, contract, o);
     this.save();
     this.showDebrief(d);
+  }
+
+  private showTutorialEnd(won: boolean): void {
+    const c = this.career && !this.career.over ? this.career : null;
+    this.show(
+      h(
+        'div',
+        { class: 'title' },
+        h('h1', null, won ? 'Tutorial complete' : 'Tutorial ended'),
+        h(
+          'div',
+          { class: 'panel' },
+          h('p', null, won ? "That's the basics. Contracts pay for wins; fuel, ammo and repairs come out of your pocket." : 'You can run it again any time from the title screen.'),
+          h('p', { class: 'muted small' }, 'Fit your mech in the Mechs tab, buy gear in the Shop, and watch your standing with the factions.'),
+          h('button', { class: 'primary big', onclick: () => (c ? this.showHangar('contracts') : this.showTitle()) }, c ? 'Back to the hangar' : 'Back to the title screen'),
+        ),
+      ),
+    );
   }
 
   private showDebrief(d: Debrief): void {

@@ -214,7 +214,10 @@ export class Mech implements Unit {
     this.heat = Math.max(0, this.heat + (L.passiveHeat - cooling) * dt);
     if (this.shutdown > 0) {
       this.shutdown = Math.max(0, this.shutdown - dt);
-      if (this.shutdown === 0) this.view.setAlpha(1);
+      if (this.shutdown === 0) {
+        this.view.setAlpha(1);
+        if (this.team === 'player') play('powerUp', 0.8);
+      }
     }
     const running = this.shutdown === 0;
 
@@ -264,6 +267,7 @@ export class Mech implements Unit {
 
     if (running && this.heat >= L.heatCapacity) {
       this.shutdown = HEAT_RULES.shutdownTime;
+      if (this.team === 'player') play('powerDown', 1);
       this.view.setAlpha(0.55);
     }
 
