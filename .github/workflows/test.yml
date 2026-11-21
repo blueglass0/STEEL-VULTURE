@@ -1,0 +1,24 @@
+name: Tests
+
+# Type-check and unit tests on every branch push and pull request. (Pushes to main also run
+# them in the deploy workflow, which won't publish if they fail.)
+on:
+  push:
+    branches-ignore: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

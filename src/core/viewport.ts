@@ -1,6 +1,6 @@
-import { settings } from './settings';
 import Phaser from 'phaser';
 import { DISPLAY } from '../config/display';
+import { settings } from './settings';
 
 /**
  * Owns the canvas size. The canvas is always stretched by CSS to fill its
@@ -60,10 +60,10 @@ export function initViewport(container: HTMLElement): ViewportInfo {
   return Viewport;
 }
 
-/** Keep the canvas matched to its container (window resize, rotation, browser bars). */
 /** Re-measure now (after the quality setting changes). Set up by `trackViewport`. */
 export let refreshViewport: () => void = () => {};
 
+/** Keep the canvas matched to its container (window resize, rotation, browser bars). */
 export function trackViewport(game: Phaser.Game, container: HTMLElement): void {
   let pending = false;
   const apply = () => {

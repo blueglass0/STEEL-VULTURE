@@ -49,11 +49,22 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
 ## Stack
 
 - TypeScript (strict), Phaser 4, Vite 8. `npm run dev` (dev server, debug overlay on),
-  `npm run build` (type-check + production build), `npm run preview`.
-- Deploy: `.github/workflows/deploy.yml` builds and publishes to GitHub Pages on every push to `main`.
+  `npm run build` (type-check + production build), `npm run preview`, `npm test` (Vitest unit tests).
+- `.npmrc` sets `legacy-peer-deps=true`: npm 10's installer crashes on Vitest's optional peers without it.
+- Deploy: `.github/workflows/deploy.yml` runs the tests, builds and publishes to GitHub Pages on every
+  push to `main` (failing tests block the deploy). `.github/workflows/test.yml` type-checks and tests
+  every other branch push and pull request.
   Pages source must be set to "GitHub Actions" in the repo settings. If it is "Deploy from a branch",
   Pages serves the raw source and the game never loads.
-- Saves go in `localStorage` (`steel-vulture.career.v1`, see `src/career/career.ts`).
+- Saves go in `localStorage` (`steel-vulture.career.v1`, see `src/career/career.ts`). The key stays;
+  the format has a number (`SAVE_VERSION`). **Changing the save format: bump `SAVE_VERSION` and add
+  a step to `MIGRATIONS`** (version n → n+1), plus a test in `tests/career.test.ts`. `repairCareer`
+  runs on every load for things game data changes under a save (weapons that no longer fit go to
+  storage with a `loadNotes` message, removed items dropped, armor/ammo clamped). Saves from a
+  newer version are refused (`saveUnreadable`: the title screen warns and confirms before a
+  new career replaces it).
+- Settings (`steel-vulture.settings.v1`) pass through `sanitizeSettings` on load: bad values fall
+  back to defaults, numbers clamp. New settings need a line there and in `tests/settings.test.ts`.
 - `?quick` skips the career and starts a throwaway mission (dev); `?debug` shows the dev tools.
 
 ## Layout
@@ -71,9 +82,23 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
     (tank, turret, structure, `createEnemy`), `Drone`, `EnemyMech`.
   - `combat/` — `Combat` (pooled projectiles and beams, hit tests), `Effects` (pooled sparks,
     explosions, smoke, scorch), `types.ts` (`Unit`: anything shots can hit).
-  - `world/` — `mapgen.ts` (seeded procedural maps), `NavGrid.ts` (A* for tanks).
+  - `world/` — `mapgen.ts` (seeded procedural maps), `NavGrid.ts` (A* for tanks), `TerrainLayer.ts`
+    (ground + chunked obstacle drawing, redraw on damage stage, culling), `Fog.ts`, `terrainArt.ts`.
+  - `missions/` — one controller per mission type (`DestroyMission`, `HuntMission`, `RaidMission`,
+    `DefendMission`, `EscortMission` on `FriendlyMission`, `TutorialMission`), base class
+    `Mission` with hooks the map scene calls (`createUnit`, `setup`, `start`, `update`,
+    `enemyLeft`, `progress` → 'evac'/'won'/'lost', `trackProgress`, `marks`, `addTargets`,
+    `tally`, `devWin`). They reach the scene only through `MissionHost` (a getter adapter, so
+    MapScene's fields stay private). A new mission type = a new controller + `createMission`.
   - `hudState.ts` — plain data the map scene publishes and the HUD reads.
 - `src/scenes/` — Phaser scenes. `Boot` (bakes art) → `Map` (world) + `Hud` (screen-space UI, laid out in CSS px).
+  `MapScene` runs the shared battlefield (player, enemies, combat, stations, backups, fog, evac,
+  HUD publishing); contract rules are in `game/missions/`. Test scripts reach mission state via
+  `scene.mission` (e.g. `mission.step` in the tutorial, `mission.waveIndex` on defend).
+- `tests/` — Vitest, Node environment, in-memory localStorage (`tests/setup.ts`). Covers the pure
+  modules only: saves and migrations, career flow, settings, map reachability (every mission type
+  and size, 25 seeds each), stock and enemy loadouts, `SectionDamage`, data integrity. Nothing
+  that imports Phaser; gameplay is checked with Playwright scripts and playtests.
 - `src/career/` — career rules and state (`career.ts`: money, upkeep, contracts, shop, loadout
   limits, loans, career over, save/load; `types.ts`). Pure logic, no DOM or Phaser.
 - `src/ui/` — HTML/DOM UI over the canvas: `app.ts` (title, hangar tabs, deploy, debrief,
@@ -100,6 +125,7 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
   Add money etc. with M5.
   `?seed=N` replays a specific map; the end screen shows each map's seed.
 - **Update this file** when a milestone changes state.
+- **Run `npm test` before pushing**; add tests for new pure logic (career rules, data, mapgen).
 
 ## Performance rules (the game must run on most hardware, including low-end PCs and phones)
 

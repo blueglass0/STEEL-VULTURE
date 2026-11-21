@@ -11,7 +11,7 @@ import { isEquipment, isWeapon, itemName } from '../data/items';
 import { fitsMount, mechStats } from '../game/mechStats';
 import { SECTIONS } from '../game/units/SectionDamage';
 import { play, setMuted, setVolume } from '../core/audio';
-import { settings, saveSettings, type ControlScheme, type TouchFire } from '../core/settings';
+import { BUTTON_SCALE, settings, saveSettings, type ControlScheme, type TouchFire } from '../core/settings';
 import { refreshViewport } from '../core/viewport';
 import { clockTime, h, money, signedMoney } from './h';
 import type { MapScene } from '../scenes/MapScene';
@@ -101,6 +101,9 @@ export class App {
       'div',
       { class: 'panel new-career', hidden: !!c && !c.over },
       h('h3', null, 'New career'),
+      !c && C.saveUnreadable
+        ? h('p', { class: 'warn' }, "Your saved career couldn't be loaded. It may be from a newer version of the game: try reloading the page. Starting a new career replaces it.")
+        : null,
       picker('Combat', 'enemy numbers, accuracy and damage', () => combat, (l) => (combat = l)),
       picker('Economy', 'costs, payouts, loans, bankruptcy', () => economy, (l) => (economy = l)),
       h(
@@ -109,6 +112,7 @@ export class App {
           class: 'primary big',
           onclick: () => {
             if (c && !c.over && !confirm('Start a new career? Your current career will be lost.')) return;
+            if (!c && C.saveUnreadable && !confirm('Replace the saved career that could not be loaded?')) return;
             this.career = C.newCareer(combat, economy);
             this.save();
             this.tab = 'contracts';
@@ -1058,7 +1062,7 @@ export class App {
             TOUCH_FIRE_HELP[settings.touchFire],
             seg<TouchFire>([['tiers', 'Ring + edge'], ['swap', 'Swap button'], ['both', 'All weapons']], settings.touchFire, (v) => (settings.touchFire = v)),
           ),
-          field('Phone button size', '', slider(80, 130, Math.round(settings.buttonScale * 100), (v) => (settings.buttonScale = v / 100), (v) => `${v}%`)),
+          field('Phone button size', '', slider(BUTTON_SCALE.min * 100, BUTTON_SCALE.max * 100, Math.round(settings.buttonScale * 100), (v) => (settings.buttonScale = v / 100), (v) => `${v}%`)),
         ),
       ];
       panel.replaceChildren(...groups.filter((g): g is HTMLElement => !!g));

@@ -35,12 +35,20 @@ const SAVE_KEY = 'steel-vulture.career.v1';
 /** Things changed while loading an old save, for the hangar to mention once. */
 export const loadNotes: string[] = [];
 
-export function loadCareer(): CareerState | null {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    const s = JSON.parse(raw) as CareerState & { mech?: MechState };
-    if (s.version !== 1) return null;
+/**
+ * Current save format. When the format changes, bump this and add a step to `MIGRATIONS`
+ * that upgrades a save from the previous version. Steps run in order on load.
+ */
+export const SAVE_VERSION = 2;
+
+type LegacySave = CareerState & { mech?: MechState };
+
+const MIGRATIONS: Record<number, (s: LegacySave) => void> = {
+  /**
+   * 1 → 2: everything added during milestones 5–9 on top of the original format. Each check
+   * only does something if the save predates that feature, so any version-1 save works.
+   */
+  1: (s) => {
     // Saves from before the hangar (M7) had a single `mech`.
     if (s.mech && !s.mechs) {
       s.mechs = [{ ...s.mech, id: 1 }];
@@ -49,26 +57,65 @@ export function loadCareer(): CareerState | null {
       s.nextMechId = 2;
       delete s.mech;
     }
-    for (const m of s.mechs) {
-      // Saves from before equipment existed (M5): give the mech the starter reactor and heat sink.
-      if (!m.equipment) m.equipment = [...STARTER_LOADOUT.equipment];
-      // Sized mounts (after M8): weapons that no longer fit their mount go to storage.
-      const mounts = CHASSIS[m.chassis].mounts;
-      for (const w of [...m.weapons]) {
-        const mount = mounts.find((x) => x.id === w.mount);
-        if (mount && WEAPONS[w.weapon] && fitsMount(WEAPONS[w.weapon], mount)) continue;
-        m.weapons.splice(m.weapons.indexOf(w), 1);
-        if (WEAPONS[w.weapon]) s.inventory.push(w.weapon);
-        loadNotes.push(`${WEAPONS[w.weapon]?.name ?? w.weapon} didn't fit the new ${CHASSIS[m.chassis].name} mounts and was moved to storage.`);
-      }
-      normalizeMech(m);
-    }
+    // Saves from before equipment existed (M5): give each mech the starter reactor and heat sink.
+    for (const m of s.mechs) if (!m.equipment) m.equipment = [...STARTER_LOADOUT.equipment];
     // Factions (M9): everyone starts neutral.
     s.reputation = Object.assign({ royalists: 0, technocrats: 0, freestars: 0 }, s.reputation);
     // Boards from before factions (M9) get fresh contracts with employers, enemies and their armies.
     if (s.activeContract === null && s.contracts.length && s.contracts.every((k) => k.employerFaction === undefined)) refreshContracts(s);
+  },
+};
+
+/**
+ * Turn stored save data into a current-format career: run every migration from the save's
+ * version up, then repair anything game data has made invalid. Returns null for data that
+ * isn't a career, or comes from a newer version of the game. Pure apart from `loadNotes`.
+ */
+export function upgradeSave(data: unknown): CareerState | null {
+  if (!data || typeof data !== 'object') return null;
+  const s = data as LegacySave;
+  if (typeof s.version !== 'number' || s.version < 1 || s.version > SAVE_VERSION) return null;
+  for (let v = s.version; v < SAVE_VERSION; v++) MIGRATIONS[v]?.(s);
+  s.version = SAVE_VERSION;
+  if (!Array.isArray(s.mechs) || s.mechs.length === 0) return null;
+  repairCareer(s);
+  return s;
+}
+
+/**
+ * Checks that run on every load, because game data can change under a save (mount sizes,
+ * removed items, armor and ammo limits): weapons that no longer fit go to storage.
+ */
+function repairCareer(s: CareerState): void {
+  for (const m of s.mechs) {
+    const mounts = CHASSIS[m.chassis].mounts;
+    for (const w of [...m.weapons]) {
+      const mount = mounts.find((x) => x.id === w.mount);
+      if (mount && WEAPONS[w.weapon] && fitsMount(WEAPONS[w.weapon], mount)) continue;
+      m.weapons.splice(m.weapons.indexOf(w), 1);
+      if (WEAPONS[w.weapon]) s.inventory.push(w.weapon);
+      loadNotes.push(`${WEAPONS[w.weapon]?.name ?? w.weapon} didn't fit the ${CHASSIS[m.chassis].name}'s mounts and was moved to storage.`);
+    }
+    m.equipment = m.equipment.filter((id) => EQUIPMENT[id]);
+    normalizeMech(m);
+  }
+  s.inventory = s.inventory.filter((id) => WEAPONS[id] || EQUIPMENT[id]);
+}
+
+/** Set by `loadCareer`: a save exists but couldn't be read (corrupt, or from a newer version). */
+export let saveUnreadable = false;
+
+export function loadCareer(): CareerState | null {
+  saveUnreadable = false;
+  let raw: string | null = null;
+  try {
+    raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const s = upgradeSave(JSON.parse(raw));
+    saveUnreadable = s === null;
     return s;
   } catch {
+    saveUnreadable = raw !== null;
     return null;
   }
 }
@@ -91,7 +138,7 @@ export function deleteCareer(): void {
 
 export function newCareer(combat: CombatLevel, economy: CombatLevel): CareerState {
   const s: CareerState = {
-    version: 1,
+    version: SAVE_VERSION,
     money: ECONOMY.startingMoney,
     loan: null,
     mechs: [],
