@@ -8,6 +8,7 @@ import { mountDomUi } from './ui/dom';
 import { App } from './ui/app';
 import './ui/ui.css';
 import { installAudioUnlock } from './core/audio';
+import { initPwa } from './pwa/pwa';
 
 const container = document.getElementById('game')!;
 document.getElementById('boot')?.remove();
@@ -41,6 +42,7 @@ mountDomUi(game, container, app);
 // Boot bakes the art, then hands over to the title screen / hangar.
 game.events.once('booted', () => app.start());
 installAudioUnlock();
+initPwa();
 
 if (import.meta.env.DEV) {
   (window as unknown as { game: Phaser.Game }).game = game;

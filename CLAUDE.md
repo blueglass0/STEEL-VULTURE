@@ -66,6 +66,19 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
 - Settings (`steel-vulture.settings.v1`) pass through `sanitizeSettings` on load: bad values fall
   back to defaults, numbers clamp. New settings need a line there and in `tests/settings.test.ts`.
 - `?quick` skips the career and starts a throwaway mission (dev); `?debug` shows the dev tools.
+- **Installable offline app (PWA).** `public/manifest.webmanifest` (fullscreen, landscape, icons in
+  `public/icons/`, regenerate with `node scripts/make-icons.cjs`). `pwaPlugin` in `vite.config.ts`
+  writes `dist/sw.js` from `src/pwa/sw.js` with the build's file list (cache name = hash of files,
+  public files and the template). The worker precaches everything, serves page loads network-first
+  (3.5 s timeout, then cache) and assets cache-first (`ignoreVary`: servers send `Vary: Origin`),
+  takes over at once and deletes older caches, so a deploy reaches players on their next online
+  launch. Registered only in production builds (`src/pwa/pwa.ts`; test with `npm run build` +
+  `npm run preview`). The title screen's "Install app" link uses the browser's install prompt
+  (Chrome/Edge/Samsung) or shows Share → Add to Home Screen on iOS; installed apps ask for
+  persistent storage. Nothing may load from other origins (no web fonts/CDNs) or offline breaks.
+  iOS gives a home-screen app its own storage: a career started in Safari doesn't carry over.
+- Type-checking: `tsconfig.json` (game + tests, browser types) and `tsconfig.node.json` (Vite and
+  Vitest configs, Node types); `npm run typecheck` runs both.
 
 ## Layout
 
