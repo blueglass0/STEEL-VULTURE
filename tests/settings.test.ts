@@ -21,7 +21,6 @@ describe('sanitizeSettings', () => {
       showFps: true,
       touchFire: 'swap',
       buttonScale: 1.2,
-      tutorialSeen: true,
     });
     expect(s).toEqual({
       scheme: { kbm: 'direction', touch: 'tank' },
@@ -33,7 +32,6 @@ describe('sanitizeSettings', () => {
       showFps: true,
       touchFire: 'swap',
       buttonScale: 1.2,
-      tutorialSeen: true,
     });
   });
 

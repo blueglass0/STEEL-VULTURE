@@ -554,9 +554,6 @@ body.in-mission .toolbar .mission-only {
   max-height: calc(100% - 24px);
   overflow-y: auto;
 }
-.screen button.card.tutorial {
-  border-left-color: var(--cyan);
-}
 .title-links {
   display: flex;
   gap: 18px;

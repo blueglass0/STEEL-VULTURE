@@ -38,6 +38,8 @@ export type SoundId =
 const VARIED: Partial<Record<SoundId, number>> = { explode: 0.25, bigExplode: 0.2, hit: 0.3, cannon: 0.15, heavy: 0.12, crunch: 0.3, step: 0.1, hurt: 0.2, mg: 0.1 };
 /** Pitch multiplier for the sound being built (frequencies scale with it). */
 let pitch = 1;
+/** Footsteps: 0 (light) .. 1 (assault) for the step being built (`playStep`). */
+let stepWeight = 0.4;
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
@@ -56,7 +58,8 @@ const MIN_GAP: Partial<Record<SoundId, number>> = {
   beam: 0.1,
   pulse: 0.06,
   zap: 0.08,
-  step: 0.07,
+  // Short, so your own steps and a nearby enemy mech's don't swallow each other.
+  step: 0.03,
   hurt: 0.12,
   win: 1,
   lose: 1,
@@ -73,6 +76,23 @@ function init(): void {
   noise = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
   const d = noise.getChannelData(0);
   for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+}
+
+/**
+ * Dev only (sound tests): render into another context, e.g. an OfflineAudioContext, and
+ * start a fresh ambience there. Does nothing in production builds.
+ */
+export function __setContextForTest(c: BaseAudioContext): void {
+  if (!import.meta.env.DEV) return;
+  ctx = c as AudioContext;
+  ambience = null;
+  master = ctx.createGain();
+  master.gain.value = masterGain();
+  master.connect(ctx.destination);
+  noise = ctx.createBuffer(1, ctx.sampleRate * 0.6, ctx.sampleRate);
+  const d = noise.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  for (const k of Object.keys(last)) delete last[k as SoundId];
 }
 
 /** Call once at startup: unlocks audio on the first user gesture. */
@@ -115,11 +135,20 @@ export function play(id: SoundId, volume = 1, rate = 1): void {
   const vary = VARIED[id] ?? 0;
   pitch = rate * (1 + (Math.random() * 2 - 1) * vary * 0.5);
   switch (id) {
-    case 'step':
-      // A heavy foot landing: low thud plus a short rumble.
-      burst(now, 0.1, 220, 'lowpass', 0.55 * v);
-      tone(now, 'sine', 80, 38, 0.11, 0.4 * v);
+    case 'step': {
+      // A metal foot landing. Phone speakers can't play much below ~300 Hz, so the parts you
+      // hear everywhere are the clank (two partials 2.76× apart, the ratio that reads as a
+      // struck metal bar) and the grit crunching under it; the thud adds weight on headphones.
+      const w = stepWeight;
+      tone(now, 'triangle', 330, 290, 0.09 + 0.06 * w, 0.2 * v);
+      tone(now, 'square', 910, 800, 0.045, 0.035 * v);
+      burst(now, 0.07 + 0.05 * w, 1250, 'bandpass', 0.42 * v, 1.1);
+      burst(now, 0.12 + 0.12 * w, 260, 'lowpass', (0.28 + 0.22 * w) * v);
+      tone(now, 'sine', 90, 34, 0.12 + 0.14 * w, (0.22 + 0.18 * w) * v);
+      // Hydraulics settling just after the foot lands.
+      burst(now + 0.035, 0.07, 4200, 'highpass', 0.06 * v);
       break;
+    }
     case 'hurt':
       // Hit on your own mech: a muffled clang through the cockpit.
       burst(now, 0.14, 420, 'lowpass', 0.7 * v);
@@ -217,36 +246,107 @@ export function play(id: SoundId, volume = 1, rate = 1): void {
   }
 }
 
-/** Footstep pitch by weight: heavy mechs thud lower. */
+/** Footstep pitch by weight: heavy mechs land lower. */
 export function stepPitch(tonnage: number): number {
   return Math.max(0.65, Math.min(1.4, Math.sqrt(50 / tonnage)));
 }
 
-/** Low rumble under a mission: looped noise through a low-pass filter. */
-let ambience: { src: AudioBufferSourceNode; gain: GainNode } | null = null;
+/** 0 for a 25 t mech up to 1 at 95 t. */
+function weightOf(tonnage: number): number {
+  return Math.max(0, Math.min(1, (tonnage - 25) / 70));
+}
+
+/**
+ * A mech footstep. Heavier mechs are lower, longer and louder (a Kestrel about 60% of a
+ * Roc). `volume`: the caller's distance scaling (1 = your own mech at full).
+ */
+export function playStep(tonnage: number, volume: number): void {
+  stepWeight = weightOf(tonnage);
+  play('step', volume * (0.55 + 0.45 * stepWeight), stepPitch(tonnage));
+}
+
+/**
+ * Mission ambience: a low wind rumble plus your mech's engine, a pair of slightly detuned
+ * sawtooth drones whose harmonics reach phone speakers. `setEngineLoad` opens the engine
+ * up as you walk and lets it die down when the mech shuts down from heat.
+ */
+let ambience: {
+  src: AudioBufferSourceNode;
+  gain: GainNode;
+  engine: OscillatorNode[];
+  engineFilter: BiquadFilterNode;
+  engineGain: GainNode;
+  load: number;
+  base: number;
+  running: boolean;
+} | null = null;
+
+const ENGINE = { hz: 46, gain: 0.02, loadGain: 0.012, cutoff: 380, loadCutoff: 650 };
 
 export function startAmbience(): void {
   if (!ctx || !master || !noise || ambience) return;
+  const t = ctx.currentTime;
   const src = ctx.createBufferSource();
   src.buffer = noise;
   src.loop = true;
   const f = ctx.createBiquadFilter();
   f.type = 'lowpass';
-  f.frequency.value = 160;
+  f.frequency.value = 300;
   const gain = ctx.createGain();
-  gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.06, ctx.currentTime + 2);
+  gain.gain.setValueAtTime(0.0001, t);
+  gain.gain.exponentialRampToValueAtTime(0.05, t + 2);
   src.connect(f).connect(gain).connect(master);
   src.start();
-  ambience = { src, gain };
+
+  const engineFilter = ctx.createBiquadFilter();
+  engineFilter.type = 'lowpass';
+  engineFilter.frequency.value = ENGINE.cutoff;
+  engineFilter.Q.value = 0.9;
+  const engineGain = ctx.createGain();
+  // Fade in with setTargetAtTime (not a ramp to a fixed time) so `setEngineLoad` can take over at once.
+  engineGain.gain.setValueAtTime(0.0001, t);
+  engineGain.gain.setTargetAtTime(ENGINE.gain, t, 0.6);
+  engineFilter.connect(engineGain).connect(master);
+  const engine = [1, 1.013].map((detune) => {
+    const o = ctx!.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.value = ENGINE.hz * detune;
+    o.connect(engineFilter);
+    o.start();
+    return o;
+  });
+  ambience = { src, gain, engine, engineFilter, engineGain, load: 0, base: ENGINE.hz, running: true };
+}
+
+/**
+ * The player's engine: `load` 0..1 (speed over top speed), heavier mechs pitched lower,
+ * near silent while shut down. Cheap to call every frame: only real changes reach the graph.
+ */
+export function setEngineLoad(load: number, tonnage: number, running: boolean): void {
+  const a = ambience;
+  if (!ctx || !a) return;
+  const base = ENGINE.hz * Math.max(0.75, Math.min(1.25, Math.sqrt(50 / tonnage)));
+  load = Math.max(0, Math.min(1, load));
+  if (Math.abs(load - a.load) < 0.04 && base === a.base && running === a.running) return;
+  a.load = load;
+  a.base = base;
+  a.running = running;
+  const t = ctx.currentTime;
+  const k = running ? 1 : 0.15;
+  a.engine.forEach((o, i) => o.frequency.setTargetAtTime(base * (1 + 0.25 * load) * (i ? 1.013 : 1) * (running ? 1 : 0.8), t, 0.3));
+  a.engineFilter.frequency.setTargetAtTime(ENGINE.cutoff + (ENGINE.loadCutoff - ENGINE.cutoff) * load, t, 0.25);
+  a.engineGain.gain.setTargetAtTime((ENGINE.gain + ENGINE.loadGain * load) * k, t, running ? 0.25 : 0.5);
 }
 
 export function stopAmbience(): void {
   if (!ctx || !ambience) return;
   const a = ambience;
   ambience = null;
-  a.gain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.3);
-  a.src.stop(ctx.currentTime + 1.5);
+  const t = ctx.currentTime;
+  a.gain.gain.setTargetAtTime(0.0001, t, 0.3);
+  a.engineGain.gain.setTargetAtTime(0.0001, t, 0.3);
+  a.src.stop(t + 1.5);
+  for (const o of a.engine) o.stop(t + 1.5);
 }
 
 function burst(t: number, dur: number, freq: number, type: BiquadFilterType, gain: number, q = 0.7): void {

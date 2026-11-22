@@ -9,7 +9,7 @@ import { settings } from '../core/settings';
 import { CollisionWorld, type Circle } from '../core/collision';
 import { DEG, clamp, smoothing, wrapAngle, type Vec } from '../core/math';
 import { randomSeed } from '../core/rng';
-import { play, startAmbience, stepPitch, stopAmbience } from '../core/audio';
+import { play, playStep, setEngineLoad, startAmbience, stopAmbience } from '../core/audio';
 import { DEBUG, debugInfo } from '../core/debug';
 import type { Section } from '../data/chassis';
 import { DAMAGE_RULES } from '../data/damage';
@@ -272,8 +272,9 @@ export class MapScene extends Phaser.Scene {
     );
     if (stepped && Math.abs(p.motor.speed) > 20) {
       if (this.movement.stepShake > 0) this.shake(90, this.movement.stepShake);
-      play('step', 0.4, stepPitch(p.chassis.tonnage));
+      playStep(p.chassis.tonnage, 0.6);
     }
+    setEngineLoad(p.alive ? Math.abs(p.motor.speed) / p.motor.move.maxSpeed : 0, p.chassis.tonnage, p.alive && p.shutdown === 0);
 
     for (const e of this.enemies) e.update(dt, this.ai);
     this.mission.update(dt, time);
