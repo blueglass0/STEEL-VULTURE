@@ -103,7 +103,10 @@ export interface MissionConfig {
   /** Combat difficulty multipliers (career setting × contract tier). */
   enemyCount: number;
   enemySpread: number;
+  /** Enemy mechs' damage (combat difficulty). */
   enemyDamage: number;
+  /** Tanks, turrets and drones: combat difficulty × the contract tier's `vehicleDamage`. */
+  vehicleDamage: number;
 }
 
 /** What the map scene reports when the mission ends. */

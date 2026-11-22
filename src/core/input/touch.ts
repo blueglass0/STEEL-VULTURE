@@ -21,6 +21,8 @@ export class TouchSource {
   private equipPointers: (number | null)[] = [null, null];
   private interactPointer: number | null = null;
   private stickFiring = false;
+  /** Right stick is past the outer ring (tiers firing: both groups). */
+  private bothOn = false;
 
   constructor(scene: Phaser.Scene) {
     const input = scene.input;
@@ -185,7 +187,10 @@ export class TouchSource {
         actions.aim.x = nx;
         actions.aim.y = ny;
       }
-      this.setStickFire(out >= CONTROLS.fireThreshold, reach >= CONTROLS.bothGroupsAt);
+      // Small hysteresis on the outer ring so a thumb resting on it doesn't flicker group 2.
+      const outer = CONTROLS.bothGroupsAt - (this.bothOn ? CONTROLS.bothGroupsHysteresis : 0);
+      this.bothOn = out >= CONTROLS.fireThreshold && reach >= outer;
+      this.setStickFire(out >= CONTROLS.fireThreshold, this.bothOn);
     }
   }
 
@@ -210,6 +215,7 @@ export class TouchSource {
   }
 
   private release(s: StickTrack): void {
+    if (s === this.right) this.bothOn = false;
     s.pointerId = null;
     s.view.active = false;
     s.view.knobX = s.view.baseX;

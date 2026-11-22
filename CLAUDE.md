@@ -42,6 +42,18 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
   its inner ring, fires group 1 past it, and fires both groups when the thumb goes past the dashed
   outer ring (`CONTROLS.bothGroupsAt` = 1.15 stick radii). 'swap' (old ⇄ button) and 'both' (every
   weapon past the ring) are options. The swap button only exists in swap mode.
+- **Balance pass after the M11 playtest** (too hard early, especially on phones; enemy mechs are
+  the fun fight, so they were left alone):
+  - Phone firing tiers: group 1 from `fireThreshold` 0.7, both groups from 1.45 stick radii, with
+    0.12 hysteresis (`bothGroupsHysteresis`); buttons moved out to a 128 px arc to clear the ring.
+  - Missed cannon shells did nearly direct-hit damage as ground splash (to the legs), so moving
+    barely helped. Vehicle cannon splash cut (tank 4 @45, heavy tank 7 @55, cannon turret 6 @55)
+    and spread up about 1°. Simulated vs a Vulture strafing at full speed: about 25–40% of the
+    standing-still damage (was 45–60%).
+  - Technocrat lasers stay accurate (hitscan, tight spread) but hit softer: laser tank 8 (was 11),
+    laser turret 11 (was 15). Machine-gun vehicles and drones +1–1.5° spread.
+  - Contract tiers scale tank/turret/drone damage (`ECONOMY.tiers[n].vehicleDamage`: 0.8 / 0.9 / 1)
+    via `MissionConfig.vehicleDamage`; enemy mechs use `enemyDamage` (combat difficulty only).
 - **Chassis feel:** heavier chassis get lower turn rates and more momentum (lower accel/decel),
   lights turn and accelerate quicker. The movement numbers in `chassis.ts` are enough to make
   chassis feel distinct (user-approved, M2).

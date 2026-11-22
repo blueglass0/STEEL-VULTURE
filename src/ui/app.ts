@@ -433,6 +433,7 @@ export class App {
       enemyCount: 1,
       enemySpread: 1.3,
       enemyDamage: TUTORIAL.enemyDamage,
+      vehicleDamage: TUTORIAL.enemyDamage,
     };
     this.tutorialRunning = true;
     play('ui', 1);

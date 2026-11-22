@@ -775,6 +775,7 @@ export function deploy(s: CareerState, contractId: number, target: AmmoTarget): 
     enemyCount: combat.enemyCount * ECONOMY.tiers[contract.tier].enemyCount * (contract.enemyFaction ? FACTIONS[contract.enemyFaction].army.enemyCount : 1),
     enemySpread: combat.enemySpread,
     enemyDamage: combat.enemyDamage,
+    vehicleDamage: combat.enemyDamage * ECONOMY.tiers[contract.tier].vehicleDamage,
   };
 }
 

@@ -45,6 +45,7 @@ function quickConfig(seed: number): MissionConfig {
     enemyCount: 1,
     enemySpread: 1,
     enemyDamage: 1,
+    vehicleDamage: 1,
   };
 }
 
@@ -151,7 +152,7 @@ export class MapScene extends Phaser.Scene {
 
   create(): void {
     const cfg = this.config;
-    const difficulty = { enemyCount: cfg.enemyCount, enemySpread: cfg.enemySpread, enemyDamage: cfg.enemyDamage };
+    const difficulty = { enemyCount: cfg.enemyCount, enemySpread: cfg.enemySpread, enemyDamage: cfg.enemyDamage, vehicleDamage: cfg.vehicleDamage };
     const army = cfg.contract.enemyFaction ? FACTIONS[cfg.contract.enemyFaction].army : null;
     this.armySkin = army?.skin ?? '';
     const forces = {
