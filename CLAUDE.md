@@ -4,10 +4,12 @@ Top-down real-time mech game. Full design and milestone plan: `docs/PLAN.md`. Re
 
 ## Current milestone
 
-**Milestone 11 (both parts) — settings, phone controls rework, quality options, tutorial,
-sound pass: built, awaiting the user's playtest** (the user will merge and test everything at
-once). M1–M10 played (defend/escort still being tuned). The plan's milestones are done except
-the optional 12 (final mission, maybe someday); next steps come from playtest feedback.
+**M1–M11 played; playtest follow-ups done** (balance pass, sounds, Search & destroy, armor
+plating fix). **Next: the expansion milestones in `docs/PLAN.md`: 13 Salvage (+ balance
+report), 14 Artillery and support enemies (incl. player artillery), 15 Chassis abilities**, then
+maybe 16 Chassis expansion (extreme light and heavy mechs). The user keeps a proposals page
+(claude.ai artifact) listing these and other ideas; update it when a milestone ships.
+Optional 12 (final mission) still "someday".
 Deferred by the user: line-of-sight shadow rendering (logic already hides enemies behind
 walls); revisit as a graphics option, likely in M11.
 Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back into `src/data/`.
@@ -54,6 +56,10 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
     laser turret 11 (was 15). Machine-gun vehicles and drones +1–1.5° spread.
   - Contract tiers scale tank/turret/drone damage (`ECONOMY.tiers[n].vehicleDamage`: 0.8 / 0.9 / 1)
     via `MissionConfig.vehicleDamage`; enemy mechs use `enemyDamage` (combat difficulty only).
+- **Armor plating brings its armor** (after the M11 playtest): installing it adds its armor to
+  every section that isn't destroyed, free; removing it takes the armor back (damage stays the
+  same, so remove + refit isn't a free repair) and is refused if a section has less armor left
+  than the plating gives (`removeEquipment` returns the reason; `App.act` shows returned strings).
 - **Chassis feel:** heavier chassis get lower turn rates and more momentum (lower accel/decel),
   lights turn and accelerate quicker. The movement numbers in `chassis.ts` are enough to make
   chassis feel distinct (user-approved, M2).

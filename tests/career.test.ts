@@ -6,19 +6,23 @@ import {
   completeMission,
   deploy,
   install,
+  installEquipment,
   itemSource,
   loadCareer,
   loadNotes,
   newCareer,
   refreshContracts,
+  removeEquipment,
   saveCareer,
   saveUnreadable,
   shopStatus,
+  totalRepairCost,
   upgradeSave,
 } from '../src/career/career';
 import type { CareerState, MissionOutcome } from '../src/career/types';
 import { CHASSIS } from '../src/data/chassis';
 import { ECONOMY } from '../src/data/economy';
+import { EQUIPMENT } from '../src/data/equipment';
 import { FACTION_ORDER, FACTIONS, REPUTATION } from '../src/data/factions';
 
 const SAVE_KEY = 'steel-vulture.career.v1';
@@ -255,6 +259,32 @@ describe('shop', () => {
       }
       s.reputation[f] = 0;
     }
+  });
+
+  it('armor plating brings its armor for free and takes it back when removed', () => {
+    const s = newCareer('normal', 'normal');
+    const m = s.mechs[0];
+    const before = { ...m.sections };
+    s.inventory.push('armorPlating');
+    expect(installEquipment(s, m, 'armorPlating')).toBe(true);
+    const plate = EQUIPMENT.armorPlating.armor!;
+    expect(m.sections.torso).toBe(before.torso + plate.torso);
+    expect(totalRepairCost(s, m)).toBe(0);
+    // Damaged: removing and refitting must not repair anything.
+    m.sections.leftArm -= 40;
+    const damaged = { ...m.sections };
+    expect(removeEquipment(s, m, m.equipment.indexOf('armorPlating'))).toBe('');
+    expect(installEquipment(s, m, 'armorPlating')).toBe(true);
+    expect(m.sections).toEqual(damaged);
+    // Nearly stripped section: removal is refused rather than destroying it.
+    m.sections.rightArm = 5;
+    expect(removeEquipment(s, m, m.equipment.indexOf('armorPlating'))).toMatch(/right arm/);
+    expect(m.equipment).toContain('armorPlating');
+    // Destroyed sections stay destroyed.
+    m.sections.rightArm = 0;
+    m.sections.torso = damaged.torso;
+    expect(removeEquipment(s, m, m.equipment.indexOf('armorPlating'))).toBe('');
+    expect(m.sections.rightArm).toBe(0);
   });
 
   it('installs only weapons that fit the mount', () => {

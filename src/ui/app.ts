@@ -1101,13 +1101,14 @@ export class App {
 
   // ---------- Helpers ----------
 
-  /** Run a career action, save, and redraw the current tab. */
+  /** Run a career action, save, and redraw. An action may return a string: why it didn't happen. */
   private act(fn: () => unknown, message = ''): void {
     const c = this.career!;
-    fn();
+    const result = fn();
     C.checkCareerOver(c);
     this.save();
-    if (message) this.flash = message;
+    if (typeof result === 'string' && result) this.flash = result;
+    else if (message) this.flash = message;
     play('ui', 0.6);
     this.showHangar();
   }

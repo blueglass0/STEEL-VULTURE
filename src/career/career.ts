@@ -396,7 +396,10 @@ export function reactorOf(m: MechState): string {
   return m.equipment.find((e) => EQUIPMENT[e].kind === 'reactor') ?? '';
 }
 
-/** Install owned equipment. A new reactor replaces the old one (which goes to inventory). */
+/**
+ * Install owned equipment. A new reactor replaces the old one (which goes to inventory).
+ * Armor plating comes with its armor: every section that isn't destroyed gains it at no cost.
+ */
 export function installEquipment(s: CareerState, m: MechState, id: string): boolean {
   const idx = s.inventory.indexOf(id);
   if (idx < 0 || !isEquipment(id)) return false;
@@ -406,17 +409,33 @@ export function installEquipment(s: CareerState, m: MechState, id: string): bool
   }
   s.inventory.splice(s.inventory.indexOf(id), 1);
   m.equipment.push(id);
+  const plating = EQUIPMENT[id].armor;
+  if (plating && !m.destroyed) for (const sec of SECTIONS) if (m.sections[sec] > 0) m.sections[sec] += plating[sec];
   normalizeMech(m);
   return true;
 }
 
-export function removeEquipment(s: CareerState, m: MechState, index: number): void {
+/**
+ * Take equipment off (to inventory). Armor plating takes its armor with it, so damage stays
+ * the same; if a section has less armor left than the plating gave, it refuses (repair first),
+ * since stripping the plating would leave that section with nothing. Returns why not, or ''.
+ */
+export function removeEquipment(s: CareerState, m: MechState, index: number): string {
   const id = m.equipment[index];
-  if (!id) return;
+  if (!id) return '';
+  const plating = EQUIPMENT[id].armor;
+  if (plating && !m.destroyed) {
+    const thin = SECTIONS.find((sec) => m.sections[sec] > 0 && m.sections[sec] - plating[sec] < 1);
+    if (thin) return `Repair the ${SECTION_NAMES[thin]} first: it has less armor left than the plating gives.`;
+    for (const sec of SECTIONS) if (m.sections[sec] > 0) m.sections[sec] -= plating[sec];
+  }
   m.equipment.splice(index, 1);
   s.inventory.push(id);
   normalizeMech(m);
+  return '';
 }
+
+const SECTION_NAMES: Record<Section, string> = { torso: 'torso', leftArm: 'left arm', rightArm: 'right arm', legs: 'legs' };
 
 /** Put an owned weapon in a hardpoint (whatever was there goes back to inventory). */
 export function install(s: CareerState, m: MechState, mountId: string, weaponId: string): boolean {
