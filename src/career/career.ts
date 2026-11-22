@@ -10,7 +10,9 @@ import { EQUIPMENT } from '../data/equipment';
 import { itemName, itemPrice, isEquipment } from '../data/items';
 import { fitsMount, mechStats } from '../game/mechStats';
 import { SECTIONS } from '../game/units/SectionDamage';
-import { randomSeed } from '../core/rng';
+import { Rng, randomSeed } from '../core/rng';
+import { SALVAGE, type ContractTerms } from '../data/salvage';
+import { rollSalvage, vehicleScrap } from './salvage';
 import type {
   BonusObjective,
   CareerState,
@@ -21,6 +23,8 @@ import type {
   MechState,
   MissionConfig,
   MissionOutcome,
+  PendingSalvage,
+  SalvageItem,
 } from './types';
 
 /**
@@ -39,7 +43,7 @@ export const loadNotes: string[] = [];
  * Current save format. When the format changes, bump this and add a step to `MIGRATIONS`
  * that upgrades a save from the previous version. Steps run in order on load.
  */
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 type LegacySave = CareerState & { mech?: MechState };
 
@@ -63,6 +67,11 @@ const MIGRATIONS: Record<number, (s: LegacySave) => void> = {
     s.reputation = Object.assign({ royalists: 0, technocrats: 0, freestars: 0 }, s.reputation);
     // Boards from before factions (M9) get fresh contracts with employers, enemies and their armies.
     if (s.activeContract === null && s.contracts.length && s.contracts.every((k) => k.employerFaction === undefined)) refreshContracts(s);
+  },
+  /** 2 → 3: salvage (M13): chassis parts and salvage waiting to be picked. */
+  2: (s) => {
+    s.parts = {};
+    s.pendingSalvage = null;
   },
 };
 
@@ -100,6 +109,11 @@ function repairCareer(s: CareerState): void {
     normalizeMech(m);
   }
   s.inventory = s.inventory.filter((id) => WEAPONS[id] || EQUIPMENT[id]);
+  for (const id of Object.keys(s.parts)) if (!CHASSIS[id] || !(s.parts[id] > 0)) delete s.parts[id];
+  if (s.pendingSalvage) {
+    s.pendingSalvage.pool = s.pendingSalvage.pool.filter((it) => (it.kind === 'part' ? CHASSIS[it.id] : it.kind === 'weapon' ? WEAPONS[it.id] : EQUIPMENT[it.id]));
+    if (s.pendingSalvage.pool.length === 0) s.pendingSalvage = null;
+  }
 }
 
 /** Set by `loadCareer`: a save exists but couldn't be read (corrupt, or from a newer version). */
@@ -148,6 +162,8 @@ export function newCareer(combat: CombatLevel, economy: CombatLevel): CareerStat
     inventory: [],
     contracts: [],
     reputation: { royalists: 0, technocrats: 0, freestars: 0 },
+    parts: {},
+    pendingSalvage: null,
     difficulty: { combat, economy },
     stats: { missions: 0, wins: 0, earned: 0, spent: 0 },
     nextContractId: 1,
@@ -767,9 +783,10 @@ export function deployBlocker(s: CareerState, contract: Contract, target: AmmoTa
   return null;
 }
 
-export function deploy(s: CareerState, contractId: number, target: AmmoTarget): MissionConfig | null {
+export function deploy(s: CareerState, contractId: number, target: AmmoTarget, terms: ContractTerms = 'pay'): MissionConfig | null {
   const contract = s.contracts.find((c) => c.id === contractId);
   if (!contract || deployBlocker(s, contract, target)) return null;
+  contract.terms = salvageExpected(contract) ? terms : 'pay';
   const cost = deployCost(s, target);
   spend(s, cost.fuel + cost.ammo + cost.backupFuel + cost.backupAmmo);
   const a = activeMech(s);
@@ -804,6 +821,7 @@ export function deploy(s: CareerState, contractId: number, target: AmmoTarget): 
 // ---------- After the mission ----------
 
 export function completeMission(s: CareerState, contract: Contract, outcome: MissionOutcome): Debrief {
+  let salvage: PendingSalvage | null = null;
   const lines: DebriefLine[] = [];
   const notes: string[] = [];
   const before = s.money;
@@ -816,13 +834,26 @@ export function completeMission(s: CareerState, contract: Contract, outcome: Mis
 
   if (outcome.won) {
     s.stats.wins++;
-    lines.push({ label: 'Contract payment', amount: contract.payout });
-    earn(s, contract.payout);
+    const terms = contract.terms ?? 'pay';
+    const pay = contractPay(contract, terms);
+    lines.push({ label: terms === 'pay' ? 'Contract payment' : `Contract payment (${SALVAGE.terms[terms].label.toLowerCase()})`, amount: pay });
+    earn(s, pay);
     if (outcome.bonusAchieved) {
       const b = bonusPayout(contract);
       lines.push({ label: `Bonus: ${contract.bonus.label}`, amount: b });
       earn(s, b);
     }
+    // Salvage (M13): scrap for wrecked vehicles; enemy mech wrecks leave items to pick.
+    const destroyed = outcome.destroyed ?? [];
+    const scrap = Math.round(vehicleScrap(destroyed) * econ(s).payouts);
+    if (scrap > 0) {
+      lines.push({ label: 'Scrap from wrecked vehicles', amount: scrap });
+      earn(s, scrap);
+    }
+    const pool = rollSalvage(destroyed, new Rng(contract.seed + s.stats.missions * 7919));
+    const picks = SALVAGE.terms[terms].picks;
+    // Full pay: the employer keeps the mech salvage.
+    if (pool.length > 0 && picks > 0) salvage = s.pendingSalvage = { employer: contract.employer, pool, picks };
   } else {
     lines.push({ label: outcome.withdrew ? 'Withdrew: no payment' : 'Mission failed: no payment', amount: 0 });
   }
@@ -863,7 +894,81 @@ export function completeMission(s: CareerState, contract: Contract, outcome: Mis
 
   refreshContracts(s);
   if (!s.over) checkCareerOver(s);
-  return { outcome, contract, lines, reputation: rep, net: s.money - before, moneyAfter: s.money, notes };
+  return { outcome, contract, lines, reputation: rep, net: s.money - before, moneyAfter: s.money, notes, salvage };
+}
+
+// ---------- Salvage (milestone 13) ----------
+
+/** Can this contract leave salvage worth choosing terms for (enemy mechs expected, or an ace)? */
+export function salvageExpected(k: Contract): boolean {
+  return (k.enemyMechs?.length ?? 0) > 0 || k.mission === 'hunt';
+}
+
+/** The payment for a win under these terms (the bonus isn't affected). */
+export function contractPay(k: Contract, terms: ContractTerms = k.terms ?? 'pay'): number {
+  return Math.round((k.payout * SALVAGE.terms[terms].pay) / 500) * 500;
+}
+
+/** What a salvage item is worth if you leave it (sold as scrap). */
+export function salvageScrapValue(s: CareerState, it: SalvageItem): number {
+  const base = it.kind === 'part' ? CHASSIS[it.id].price * SALVAGE.partValue : itemPrice(it.id);
+  return Math.round(base * SALVAGE.scrapShare * econ(s).payouts);
+}
+
+/** Selling one chassis part. */
+export function partSellPrice(s: CareerState, chassisId: string): number {
+  return price(s, CHASSIS[chassisId].price * SALVAGE.partValue);
+}
+
+/** Assembling a mech from parts. */
+export function assemblyFee(s: CareerState, chassisId: string): number {
+  return price(s, CHASSIS[chassisId].price * SALVAGE.assemblyFee);
+}
+
+/**
+ * Take the chosen salvage (indices into the pool, up to the picks allowed): weapons and
+ * equipment to storage, parts to the parts bin. Everything else is sold as scrap.
+ */
+export function claimSalvage(s: CareerState, chosen: readonly number[]): { taken: SalvageItem[]; scrap: number } | null {
+  const p = s.pendingSalvage;
+  if (!p) return null;
+  const picked = [...new Set(chosen)].filter((i) => Number.isInteger(i) && i >= 0 && i < p.pool.length);
+  if (picked.length > p.picks) return null;
+  const taken: SalvageItem[] = [];
+  let scrap = 0;
+  p.pool.forEach((it, i) => {
+    if (!picked.includes(i)) {
+      scrap += salvageScrapValue(s, it);
+      return;
+    }
+    taken.push(it);
+    if (it.kind === 'part') s.parts[it.id] = (s.parts[it.id] ?? 0) + 1;
+    else s.inventory.push(it.id);
+  });
+  earn(s, scrap);
+  s.pendingSalvage = null;
+  return { taken, scrap };
+}
+
+/** Build a mech from salvaged parts: the frame with its stock equipment, no weapons, no ammo. */
+export function assembleChassis(s: CareerState, chassisId: string): MechState | null {
+  const fee = assemblyFee(s, chassisId);
+  if ((s.parts[chassisId] ?? 0) < SALVAGE.partsToAssemble || s.money < fee) return null;
+  s.parts[chassisId] -= SALVAGE.partsToAssemble;
+  if (s.parts[chassisId] <= 0) delete s.parts[chassisId];
+  spend(s, fee);
+  const m = addMech(s, chassisId);
+  m.weapons = [];
+  m.ammo = { ballistic: 0, missile: 0 };
+  return m;
+}
+
+export function sellPart(s: CareerState, chassisId: string): boolean {
+  if (!(s.parts[chassisId] > 0)) return false;
+  s.parts[chassisId]--;
+  if (s.parts[chassisId] <= 0) delete s.parts[chassisId];
+  earn(s, partSellPrice(s, chassisId));
+  return true;
 }
 
 /** Sell spare gear (cheapest first) until `needed` is covered. */
@@ -883,7 +988,8 @@ function autoSell(s: CareerState, needed: number, notes: string[]): void {
 /** Money you could raise by selling spare gear and every mech you aren't fielding. */
 export function sellableValue(s: CareerState): number {
   const spareMechs = s.mechs.filter((m) => m.id !== s.activeMechId).reduce((t, m) => t + mechSellValue(s, m), 0);
-  return s.inventory.reduce((t, id) => t + sellPrice(s, id), 0) + spareMechs;
+  const parts = Object.entries(s.parts).reduce((t, [id, n]) => t + n * partSellPrice(s, id), 0);
+  return s.inventory.reduce((t, id) => t + sellPrice(s, id), 0) + spareMechs + parts;
 }
 
 /**

@@ -562,3 +562,57 @@ body.in-mission .toolbar .mission-only {
   margin: -8px 0 0;
   font-size: 13px;
 }
+
+/* Salvage (milestone 13) */
+.actions .muted {
+  align-self: center;
+  margin-right: auto;
+}
+.row-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.salvage-bar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 12px 0;
+}
+.salvage-count {
+  color: var(--accent);
+  font-weight: 600;
+}
+.salvage-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+.screen button.salvage-item {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  text-align: left;
+  padding: 10px 12px;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  min-width: 0;
+}
+.screen button.salvage-item.on {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.screen button.salvage-item:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.salvage-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}

@@ -162,6 +162,7 @@ Chosen from a proposals list (kept as a page for the user). Order: 13, 14, 15, t
    - Save format change (parts in the career): `SAVE_VERSION` 3 with a migration and tests.
    - Alongside: a **balance report** in the test suite: every weapon's damage per second, heat per second, damage per ton and per credit, sustained damage under each chassis's cooling, and time-to-kill against each enemy type, with outliers flagged. A full duel simulator would need combat and mech logic separated from Phaser; the report comes first.
    - *You test:* are enemy mechs now the fights you look for? Is pay versus salvage a real choice?
+   - Built: terms are full pay (no picks), balanced (80% pay, 2 picks) and salvage rights (55% pay, 4 picks), offered only on contracts with enemy mechs or an ace. Vehicle scrap is paid on every win. Unpicked salvage sells for 10% of its value; assembling costs 30% of the chassis price and gives the frame without weapons. The balance report is `npm run balance` → `docs/BALANCE.md`.
 14. **Artillery and support enemies.** Attacks you can see coming, so movement is a skill.
    - Indirect fire: shells arc over terrain, a warning circle marks the impact point for about 2 seconds, then splash damage. Enemies: mortar tanks, and static artillery batteries at outposts that need a spotter drone to see you (kill the spotter and the battery is blind beyond its own sight).
    - Player artillery on back mounts (the mount kind was made for this): a medium mortar and a large artillery cannon. Aiming: on PC, at the cursor (within minimum and maximum range, in a wide arc in front of the torso); on phones, at the locked target, using the missile lock rules (nearest detected enemy near the aim line), leading a moving target. It can hit units behind walls that you or your radar can see, so sensors matter more.
@@ -174,7 +175,7 @@ Chosen from a proposals list (kept as a page for the user). Order: 13, 14, 15, t
    - Bulwark (assaults): a frontal barrier that blocks shots for a few seconds while braced.
    - Enemy mechs use their chassis's ability too.
    - *You test:* do the chassis feel more different? Is the third phone button comfortable?
-16. **Chassis expansion** (proposed, after 15 so abilities can shape the new mechs). The current lineup covers 25–90 t in one band (speed 92–240, torso turn 55–160°/s). Candidates:
+16. **Chassis expansion** (proposed, after 15 so abilities can shape the new mechs; full notes in `docs/MECH_LINEUP.md`). The current lineup covers 25–90 t in one band (speed 92–240, torso turn 55–160°/s). Candidates:
    - An ultralight (about 20 t, 270+ speed, jump jets, very thin armor) for raids and hunts.
    - A fast medium (about 45 t, 180 speed) to fill the gap between the Shrike (35 t, 195) and the Vulture (50 t, 150).
    - A super-heavy (about 110 t, 70 speed, two large back mounts, bulwark). Constraints: collision radius at most about 47 (maps keep 100-unit gaps), it fails more tonnage-limited contracts, and large maps take about a minute to cross.

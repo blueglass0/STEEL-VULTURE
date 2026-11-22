@@ -32,6 +32,7 @@ export class HuntMission extends Mission {
     };
     const ace = new EnemyMech(h.scene, aceDef, p.x, p.y, p.angle, { x: p.x, y: p.y }, h.armySkin);
     ace.roam = h.map.sites;
+    ace.isAce = true;
     this.ace = ace;
     return ace;
   }

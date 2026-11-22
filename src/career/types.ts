@@ -2,6 +2,7 @@ import type { Section } from '../data/chassis';
 import type { Loadout } from '../data/loadouts';
 import type { FactionId } from '../data/factions';
 import type { MapSize, MissionType } from '../data/missions';
+import type { ContractTerms } from '../data/salvage';
 
 export type CombatLevel = 'easy' | 'normal' | 'hard';
 
@@ -54,6 +55,36 @@ export interface Contract {
   /** Enemy mechs on the map (EnemyDef ids) and drone flights. Missing on contracts from before milestone 8. */
   enemyMechs?: string[];
   droneFlights?: number;
+  /** Pay or salvage, chosen when deploying (milestone 13; missing = full pay). */
+  terms?: ContractTerms;
+}
+
+/** An enemy unit destroyed in a mission, for scrap and salvage (milestone 13). */
+export interface DestroyedUnit {
+  /** EnemyDef id. */
+  type: string;
+  /** Display name (the hunted ace's includes its callsign). */
+  name?: string;
+  /** Enemy mechs: arms that had been shot off (their weapons rarely survive). */
+  lost?: Section[];
+  /** The hunted ace: more parts. */
+  ace?: boolean;
+}
+
+/** One recovered item: a weapon, equipment, or a chassis part (id = chassis id). */
+export interface SalvageItem {
+  kind: 'weapon' | 'equipment' | 'part';
+  id: string;
+  /** Which enemy it came from. */
+  from: string;
+}
+
+/** Salvage waiting to be picked after a win (kept in the save until the player chooses). */
+export interface PendingSalvage {
+  /** Who the contract was for, for the screen's heading. */
+  employer: string;
+  pool: SalvageItem[];
+  picks: number;
 }
 
 export interface LoanState {
@@ -81,6 +112,10 @@ export interface CareerState {
   contracts: Contract[];
   /** Standing with each faction, -100..100 (milestone 9). */
   reputation: Record<FactionId, number>;
+  /** Salvaged chassis parts by chassis id (milestone 13). */
+  parts: Record<string, number>;
+  /** Salvage from the last win, until it's been picked. */
+  pendingSalvage: PendingSalvage | null;
   difficulty: { combat: CombatLevel; economy: CombatLevel };
   stats: { missions: number; wins: number; earned: number; spent: number };
   nextContractId: number;
@@ -129,6 +164,8 @@ export interface MissionOutcome {
   backupsUsed: number;
   /** Money spent at field stations during the mission. */
   fieldCosts: { label: string; amount: number }[];
+  /** Every enemy unit destroyed (escaped trucks aren't), for scrap and salvage. */
+  destroyed?: DestroyedUnit[];
 }
 
 export interface DebriefLine {
@@ -145,4 +182,6 @@ export interface Debrief {
   net: number;
   moneyAfter: number;
   notes: string[];
+  /** Salvage to pick from, if any (also kept in `CareerState.pendingSalvage`). */
+  salvage: PendingSalvage | null;
 }

@@ -1,9 +1,10 @@
 import type Phaser from 'phaser';
 import * as C from '../career/career';
-import type { CareerState, CombatLevel, Contract, Debrief, MissionConfig, MissionOutcome } from '../career/types';
+import type { CareerState, CombatLevel, Contract, Debrief, MissionConfig, MissionOutcome, SalvageItem } from '../career/types';
 import { CHASSIS, CHASSIS_ORDER, type MountDef, type MountKind, type Section } from '../data/chassis';
 import { ECONOMY, SHOP_STOCK } from '../data/economy';
 import { MISSION_TYPES, TUTORIAL } from '../data/missions';
+import { SALVAGE, type ContractTerms } from '../data/salvage';
 import { FACTIONS, FACTION_ORDER, REPUTATION, type FactionId } from '../data/factions';
 import { WEAPONS, type WeaponDef } from '../data/weapons';
 import { EQUIPMENT, type EquipmentDef } from '../data/equipment';
@@ -35,6 +36,8 @@ export class App {
   private selectedMech = 0;
   private ammoTarget = { ballistic: 0, missile: 0 };
   private flash = '';
+  /** Contract terms picked in the deploy panel (kept between contracts). */
+  private terms: ContractTerms = 'pay';
   private inMission = false;
   private quick = new URLSearchParams(window.location.search).has('quick');
 
@@ -174,6 +177,7 @@ export class App {
     const c = this.career;
     if (!c) return this.showTitle();
     if (c.over) return this.showCareerOver();
+    if (c.pendingSalvage) return this.showSalvage();
     this.tab = tab;
     const tabs: [Tab, string][] = [
       ['contracts', 'Contracts'],
@@ -303,6 +307,9 @@ export class App {
     const ammoFields = [ammoField('ballistic', 'Ballistic ammo', 10), cap.missile > 0 ? ammoField('missile', 'Missiles', 2) : null];
     renderCosts();
 
+    // Salvage terms (M13): only worth choosing when enemy mechs are expected.
+    const termsField = C.salvageExpected(k) ? this.termsField(k) : null;
+
     const damaged = SECTIONS.filter((s) => C.sectionRepairCost(c, active, s) > 0);
     const others = c.mechs.filter((m) => m.id !== active.id);
     const lance = h(
@@ -365,6 +372,7 @@ export class App {
         { class: 'panel' },
         h('h3', null, 'Prepare'),
         lance,
+        termsField,
         ammoFields,
         costs,
         damaged.length > 0 && !active.destroyed
@@ -378,7 +386,7 @@ export class App {
 
   private deploy(k: Contract): void {
     const c = this.career!;
-    const config = C.deploy(c, k.id, this.ammoTarget);
+    const config = C.deploy(c, k.id, this.ammoTarget, this.terms);
     if (!config) return;
     this.save();
     this.selectedContract = null;
@@ -728,7 +736,137 @@ export class App {
         'Open-market gear is sold to anyone. Faction gear unlocks as that faction comes to trust you (Factions tab).',
         discount > 0 ? ` Freestar contacts get you ${Math.round(discount * 100)}% off open-market gear.` : '',
       ),
-      h('div', { class: 'cols' }, mechs, weapons, equipment, sell),
+      h('div', { class: 'cols' }, mechs, weapons, equipment, this.partsPanel(c), sell),
+    );
+  }
+
+  /** Salvaged chassis parts: assemble a mech from enough of them, or sell them. */
+  private partsPanel(c: CareerState): HTMLElement | null {
+    const ids = Object.keys(c.parts).filter((id) => c.parts[id] > 0 && CHASSIS[id]);
+    if (ids.length === 0) return null;
+    const need = SALVAGE.partsToAssemble;
+    return h(
+      'div',
+      { class: 'panel' },
+      h('h3', null, 'Salvaged parts'),
+      ids.map((id) => {
+        const n = c.parts[id];
+        const name = CHASSIS[id].name;
+        const fee = C.assemblyFee(c, id);
+        return h(
+          'div',
+          { class: 'shop-row' },
+          h(
+            'div',
+            null,
+            h('b', null, `${name} parts`),
+            h('span', { class: 'chip' }, `${n} / ${need}`),
+            h('div', { class: 'muted small' }, n >= need ? `Enough to assemble a ${name}: the frame and its stock equipment, no weapons.` : `${need - n} more to assemble a ${name}.`),
+          ),
+          h(
+            'div',
+            { class: 'row-buttons' },
+            n >= need
+              ? h(
+                  'button',
+                  {
+                    class: 'small-btn',
+                    disabled: fee > c.money,
+                    onclick: () =>
+                      this.act(() => {
+                        const m = C.assembleChassis(c, id);
+                        if (m) this.selectedMech = m.id;
+                      }, `Assembled a ${name}. It's in your hangar (Mechs tab) and needs weapons.`),
+                  },
+                  `Assemble ${money(fee)}`,
+                )
+              : null,
+            h('button', { class: 'small-btn', onclick: () => this.act(() => C.sellPart(c, id), `Sold a ${name} part.`) }, `Sell one ${money(C.partSellPrice(c, id))}`),
+          ),
+        );
+      }),
+    );
+  }
+
+  /** Deploy panel: full pay, or less pay for salvage picks after a win. */
+  private termsField(k: Contract): HTMLElement {
+    const seg = h('div', { class: 'seg' });
+    const note = h('div', { class: 'muted small' });
+    const render = () => {
+      seg.replaceChildren(
+        ...(Object.keys(SALVAGE.terms) as ContractTerms[]).map((t) =>
+          h('button', { type: 'button', class: this.terms === t ? 'on' : '', onclick: () => ((this.terms = t), render()) }, SALVAGE.terms[t].label),
+        ),
+      );
+      const picks = SALVAGE.terms[this.terms].picks;
+      note.textContent =
+        `${money(C.contractPay(k, this.terms))} on a win` +
+        (picks > 0 ? `, then pick ${picks} items from the enemy mechs you destroy.` : '. The employer keeps the enemy mech salvage.');
+    };
+    render();
+    return h('div', { class: 'field' }, h('div', { class: 'field-label' }, 'Terms'), seg, note);
+  }
+
+  // ---------- Salvage (milestone 13) ----------
+
+  private showSalvage(): void {
+    const c = this.career!;
+    const p = c.pendingSalvage;
+    if (!p) return this.showHangar();
+    const chosen = new Set<number>();
+    const counter = h('span', { class: 'salvage-count' });
+    const scrapOut = h('span', { class: 'muted' });
+    const list = h('div', { class: 'salvage-list' });
+    const render = () => {
+      counter.textContent = `${chosen.size} of ${p.picks} picked`;
+      const scrap = p.pool.reduce((t, it, i) => t + (chosen.has(i) ? 0 : C.salvageScrapValue(c, it)), 0);
+      scrapOut.textContent = `The rest sells for scrap: ${money(scrap)}`;
+      list.replaceChildren(
+        ...p.pool.map((it, i) => {
+          const on = chosen.has(i);
+          return h(
+            'button',
+            {
+              type: 'button',
+              class: `salvage-item ${on ? 'on' : ''}`,
+              disabled: !on && chosen.size >= p.picks,
+              onclick: () => {
+                if (on) chosen.delete(i);
+                else chosen.add(i);
+                render();
+              },
+            },
+            h('div', { class: 'salvage-top' }, h('b', null, salvageName(it)), h('span', { class: 'chip' }, it.kind === 'part' ? 'chassis part' : it.kind), it.kind === 'part' ? null : sourceChip(it.id)),
+            h('div', { class: 'muted small' }, salvageDetail(c, it)),
+            h('div', { class: 'muted small' }, `From: ${it.from} · scrap ${money(C.salvageScrapValue(c, it))}`),
+          );
+        }),
+      );
+    };
+    render();
+    const take = () => {
+      const r = C.claimSalvage(c, [...chosen]);
+      if (!r) return;
+      const names = r.taken.map(salvageName);
+      const ready = r.taken.filter((it) => it.kind === 'part' && (c.parts[it.id] ?? 0) >= SALVAGE.partsToAssemble).map((it) => CHASSIS[it.id].name);
+      this.flash =
+        (names.length ? `Salvage taken: ${names.join(', ')}.` : 'No salvage taken.') +
+        ` The rest sold for scrap: ${money(r.scrap)}.` +
+        (ready.length ? ` You have enough parts to assemble a ${[...new Set(ready)].join(' and a ')} (Shop tab).` : '');
+      this.save();
+      play('ui', 0.8);
+      this.showHangar(names.length ? 'shop' : 'contracts');
+    };
+    this.show(
+      h(
+        'div',
+        { class: 'debrief won salvage' },
+        h('h1', null, 'Salvage'),
+        h('p', { class: 'muted' }, `Recovered from the enemy mechs on the ${p.employer} contract. Your terms allow ${p.picks} pick${p.picks === 1 ? '' : 's'}; weapons and equipment go to storage, parts to the parts bin. Faction gear is yours even if their shop won't sell to you.`),
+        h('div', { class: 'salvage-bar' }, counter, scrapOut),
+        list,
+        h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: take }, 'Take salvage')),
+      ),
     );
   }
 
@@ -911,7 +1049,14 @@ export class App {
             ),
           ),
         ),
-        h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: () => this.showHangar(repairs > 0 ? 'mech' : 'contracts') }, 'Return to hangar')),
+        d.salvage
+          ? h(
+              'div',
+              { class: 'actions' },
+              h('span', { class: 'muted' }, `${d.salvage.pool.length} item${d.salvage.pool.length === 1 ? '' : 's'} recovered from enemy mechs.`),
+              h('button', { class: 'primary big', onclick: () => this.showSalvage() }, `Pick salvage (${d.salvage.picks})`),
+            )
+          : h('div', { class: 'actions' }, h('button', { class: 'primary big', onclick: () => this.showHangar(repairs > 0 ? 'mech' : 'contracts') }, 'Return to hangar')),
       ),
     );
     if (c.overReason && !c.over) c.overReason = undefined;
@@ -1123,6 +1268,17 @@ const TOUCH_FIRE_HELP: Record<TouchFire, string> = {
   swap: 'the stick fires one group; the ⇄ button switches which',
   both: 'past the inner ring fires every weapon',
 };
+
+function salvageName(it: SalvageItem): string {
+  return it.kind === 'part' ? `${CHASSIS[it.id].name} part` : itemName(it.id);
+}
+
+function salvageDetail(c: CareerState, it: SalvageItem): string {
+  if (it.kind === 'weapon') return weaponStats(WEAPONS[it.id]);
+  if (it.kind === 'equipment') return equipmentStats(EQUIPMENT[it.id]);
+  const have = c.parts[it.id] ?? 0;
+  return `You have ${have} of ${SALVAGE.partsToAssemble} needed to assemble a ${CHASSIS[it.id].name} (${CHASSIS[it.id].weightClass}, ${CHASSIS[it.id].tonnage} t).`;
+}
 
 function row(label: string, detail: string, value: string, cls = ''): HTMLElement {
   return h('div', { class: `row ${cls}` }, h('span', null, label, detail ? h('span', { class: 'muted small' }, ` ${detail}`) : null), h('span', { class: 'num' }, value));
