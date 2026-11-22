@@ -419,9 +419,14 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
   `CLEAR.extraRoamers` (2) more roaming tanks, plus the contract's mechs and drones.
   `ClearMission`: objectives = every enemy unit at the start except structures and trucks;
   destroy `CLEAR.required` (75%, rounded up) then evac. When no remaining objective is on your
-  sensors (`detection !== 'hidden'`), one HUD arrow points at the nearest. Tier-2 sample: 20
-  units, 15 required. Map gen consumes the RNG the same way for other mission types, so their
-  seeds are unchanged.
+  sensors (`detection !== 'hidden'`), one HUD arrow points at the nearest. Map gen consumes the
+  RNG the same way for other mission types, so their seeds are unchanged.
+- After the first playtest ("slightly too easy": with 75% you could pick off patrols and skip
+  outposts): +1 flat turret per outpost (`CLEAR.extraTurrets`, after difficulty/army scaling, so
+  turrets are 35–48% of the force) and an enemy response: at 35% and 70% of the quota the
+  nearest 3 / 5 uncommitted tanks, mechs and drones within 2600 are alerted to your position
+  (`ClearMission.update`, announced with a warning). Forces (standard map): tier 1 ~11–15 units,
+  tier 2 ~20–25, tier 3 ~27–39 (Technocrats fewest, Royalists most); 75% required.
 
 ## Defend and escort notes (M10 part 2)
 
@@ -489,7 +494,9 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
   low-pass) that opens up with walking speed and dies down during heat shutdown
   (`setEngineLoad(load, tonnage, running)`, called every frame from MapScene; only real changes
   touch the audio graph). Measured offline (`__setContextForTest`, dev only): steps −41/−38/−33
-  dB (light/medium/assault; cannon shot −32), idle engine −47 dB, walking −43 dB.
+  dB (light/medium/assault; cannon shot −32) at the old player volume 0.6; lowered to 0.45
+  (about −2.5 dB; enemy mechs 0.4 × distance) after the user found them a bit loud. Idle engine
+  −47 dB, walking −43 dB.
 - Test scripts may still click `.card:not(.tutorial)`; harmless now that the card is gone.
 
 ## Conventions

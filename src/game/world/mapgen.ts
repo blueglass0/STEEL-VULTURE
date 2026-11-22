@@ -335,7 +335,8 @@ export function generateMap(seed: number, difficulty: CombatDifficulty, opts: Ma
   const targets: Placement[] = [];
   const turrets: Placement[] = [];
   const tanks: Placement[] = [];
-  const turretCount = Math.max(1, Math.round(T.turretsPerTarget * difficulty.enemyCount));
+  // Search & destroy adds a flat turret per outpost (not scaled by difficulty or army size).
+  const turretCount = Math.max(1, Math.round(T.turretsPerTarget * difficulty.enemyCount)) + (opts.mission === 'clear' ? CLEAR.extraTurrets : 0);
   const turretTypes = forces.turretTypes ?? T.turretTypes;
   for (const s of sites) {
     if (opts.mission === 'destroy') targets.push({ type: T.target, x: s.x, y: s.y, angle: 0 });
