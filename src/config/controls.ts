@@ -5,7 +5,7 @@ export const CONTROLS = {
   /** Stick input below this fraction is ignored. */
   stickDeadZone: 0.15,
   /** Right stick: aim only below this (fraction of full tilt after the dead zone), fire above it. */
-  fireThreshold: 0.75,
+  fireThreshold: 0.7,
   /** Right stick centre: distance from the bottom-right corner. */
   rightStickInset: { x: 135, y: 122 },
   /** A touch this many radii from the right stick centre grabs it. */
@@ -23,11 +23,15 @@ export const CONTROLS = {
    * (degrees; 0 = right, 90 = down). Swap mode uses the first slot for the swap button and
    * moves the equipment along; interact (field stations) always takes the lower-left slot.
    */
-  buttonArc: 118,
+  buttonArc: 128,
   buttonSlots: [212, 252, 292],
   interactSlot: 158,
-  /** 'tiers' firing: the thumb this far out (in stick radii) fires both groups. */
-  bothGroupsAt: 1.15,
+  /**
+   * 'tiers' firing: the thumb this far out (in stick radii) fires both groups; once firing both,
+   * it keeps doing so until the thumb comes back inside `bothGroupsAt - bothGroupsHysteresis`.
+   */
+  bothGroupsAt: 1.45,
+  bothGroupsHysteresis: 0.12,
   /** A floating stick's base never spawns closer than this to the screen edge (beyond its radius). */
   stickEdgeMargin: 26,
 } as const;

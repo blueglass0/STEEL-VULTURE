@@ -176,14 +176,16 @@ export function bakeArt(scene: Phaser.Scene): void {
     3,
   );
   // Outer ring ('tiers' firing): thumb past it fires both weapon groups. Dashed, so it reads as a boundary.
+  const outerR = CONTROLS.stickRadius * CONTROLS.bothGroupsAt;
+  const outerSize = Math.ceil((outerR + 4) * 2);
   bake(
     scene,
     'stick-ring-outer',
-    160,
-    160,
+    outerSize,
+    outerSize,
     (g) => {
       g.lineStyle(2, 0x7fe6ff, 0.55);
-      const r = CONTROLS.stickRadius * CONTROLS.bothGroupsAt;
+      const r = outerR;
       for (let i = 0; i < 24; i++) {
         const a0 = (i / 24) * Math.PI * 2;
         const a1 = a0 + (Math.PI * 2) / 24 / 2;

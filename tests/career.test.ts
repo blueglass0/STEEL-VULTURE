@@ -18,6 +18,7 @@ import {
 } from '../src/career/career';
 import type { CareerState, MissionOutcome } from '../src/career/types';
 import { CHASSIS } from '../src/data/chassis';
+import { ECONOMY } from '../src/data/economy';
 import { FACTION_ORDER, FACTIONS, REPUTATION } from '../src/data/factions';
 
 const SAVE_KEY = 'steel-vulture.career.v1';
@@ -201,6 +202,18 @@ describe('contracts and missions', () => {
     completeMission(s, k, o);
     expect(s.money).toBe(money - 1234);
     expect(s.reputation[k.employerFaction!]).toBe(REPUTATION.failed);
+  });
+
+  it('softens tanks, turrets and drones on low-risk work but not enemy mechs', () => {
+    for (const tier of [1, 2, 3] as const) {
+      const s = newCareer('normal', 'normal');
+      const k = openContract(s);
+      k.tier = tier;
+      const cfg = deploy(s, k.id, { ballistic: 0, missile: 0 })!;
+      expect(cfg.enemyDamage).toBe(1);
+      expect(cfg.vehicleDamage).toBe(ECONOMY.tiers[tier].vehicleDamage);
+    }
+    expect(ECONOMY.tiers[1].vehicleDamage).toBeLessThan(ECONOMY.tiers[3].vehicleDamage);
   });
 
   it('refuses to deploy a mech over the contract tonnage', () => {

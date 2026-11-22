@@ -41,11 +41,15 @@ export const ECONOMY = {
     stationsPerMap: [1, 2] as [number, number],
     swapChance: 0.35,
   },
+  /**
+   * `vehicleDamage` multiplies tank, turret and drone damage (on top of combat difficulty) so
+   * low-risk work is gentler; enemy mechs keep their full strength on every tier.
+   */
   tiers: {
-    1: { name: 'Low risk', payout: [55000, 75000], targets: 2, enemyCount: 0.7 },
-    2: { name: 'Standard', payout: [90000, 120000], targets: 3, enemyCount: 1 },
-    3: { name: 'High risk', payout: [140000, 180000], targets: 4, enemyCount: 1.35 },
-  } as Record<1 | 2 | 3, { name: string; payout: [number, number]; targets: number; enemyCount: number }>,
+    1: { name: 'Low risk', payout: [55000, 75000], targets: 2, enemyCount: 0.7, vehicleDamage: 0.8 },
+    2: { name: 'Standard', payout: [90000, 120000], targets: 3, enemyCount: 1, vehicleDamage: 0.9 },
+    3: { name: 'High risk', payout: [140000, 180000], targets: 4, enemyCount: 1.35, vehicleDamage: 1 },
+  } as Record<1 | 2 | 3, { name: string; payout: [number, number]; targets: number; enemyCount: number; vehicleDamage: number }>,
   /** Chance of each tier appearing on the board. */
   tierWeights: { 1: 0.4, 2: 0.4, 3: 0.2 } as Record<1 | 2 | 3, number>,
   loan: {

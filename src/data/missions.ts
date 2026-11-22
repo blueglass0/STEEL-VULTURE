@@ -4,7 +4,7 @@
  */
 export const DESTROY_TARGETS = {
   name: 'Destroy targets',
-  briefing: (n: number) => `Destroy ${n} uplink towers`,
+  briefing: (n: number) => (n === 1 ? 'Destroy the uplink tower' : `Destroy ${n} uplink towers`),
   map: {
     width: 3200,
     height: 3200,

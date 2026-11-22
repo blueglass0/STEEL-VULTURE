@@ -19,7 +19,8 @@ export interface AiContext {
   fx: Effects;
   /** Everything that blocks movement (player and living enemies). */
   bodies: readonly Circle[];
-  difficulty: CombatDifficulty;
+  /** `enemyDamage` is for enemy mechs; tanks, turrets and drones use `vehicleDamage`. */
+  difficulty: CombatDifficulty & { vehicleDamage: number };
 }
 
 export type Detection = 'visible' | 'radar' | 'hidden';
@@ -248,7 +249,7 @@ export abstract class Gunner extends Enemy {
     if (d > this.weapon.range || Math.abs(wrapAngle(want - this.gunAngle)) > 6 * DEG) return;
     const mx = this.x + Math.cos(this.gunAngle) * muzzle;
     const my = this.y + Math.sin(this.gunAngle) * muzzle;
-    ctx.combat.fire(mx, my, this.gunAngle, this.weapon, 'enemy', ctx.difficulty.enemyDamage, ctx.difficulty.enemySpread, this.aimDistance(p) - muzzle, p);
+    ctx.combat.fire(mx, my, this.gunAngle, this.weapon, 'enemy', ctx.difficulty.vehicleDamage, ctx.difficulty.enemySpread, this.aimDistance(p) - muzzle, p);
     // A little randomness so groups don't fire in lockstep.
     this.cooldown = (1 / this.weapon.fireRate) * (0.85 + Math.random() * 0.3);
   }
