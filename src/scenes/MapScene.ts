@@ -272,7 +272,7 @@ export class MapScene extends Phaser.Scene {
     );
     if (stepped && Math.abs(p.motor.speed) > 20) {
       if (this.movement.stepShake > 0) this.shake(90, this.movement.stepShake);
-      playStep(p.chassis.tonnage, 0.6);
+      playStep(p.chassis.tonnage, 0.45);
     }
     setEngineLoad(p.alive ? Math.abs(p.motor.speed) / p.motor.move.maxSpeed : 0, p.chassis.tonnage, p.alive && p.shutdown === 0);
 

@@ -196,7 +196,7 @@ export class EnemyMech extends Enemy {
     const oy = this.y;
     // Footsteps carry: you can hear a heavy mech you can't see.
     if (mech.update(dt, input, ctx.world, ctx.bodies, ctx.combat) && Math.abs(mech.motor.speed) > 20) {
-      playStep(mech.chassis.tonnage, ctx.combat.volumeAt(this.x, this.y) * 0.5);
+      playStep(mech.chassis.tonnage, ctx.combat.volumeAt(this.x, this.y) * 0.4);
     }
     this.x = mech.x;
     this.y = mech.y;

@@ -152,6 +152,18 @@ export const CLEAR = {
   required: 0.75,
   /** Roaming tanks on top of the usual ones, so the hunt has more to find between outposts. */
   extraRoamers: 2,
+  /**
+   * Extra turrets per outpost (added after difficulty and army size scaling), so reaching the quota means assaulting
+   * outposts rather than only picking off patrols (after the first playtest: too easy).
+   */
+  extraTurrets: 1,
+  /**
+   * The enemy responds: when each share of the quota is destroyed, the nearest uncommitted
+   * tanks, mechs and drones (up to `responseSize`, within `responseRadius`) are sent at you.
+   */
+  responseAt: [0.35, 0.7],
+  responseSize: [3, 5],
+  responseRadius: 2600,
 };
 
 /** Convoy raid: trucks drive across the map along a road; stop enough of them before they get away. */
