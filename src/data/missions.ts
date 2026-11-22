@@ -53,7 +53,7 @@ export const DESTROY_TARGETS = {
   targetMinDistance: 1300,
 } as const;
 
-export type MissionType = 'destroy' | 'hunt' | 'raid' | 'defend' | 'escort' | 'tutorial';
+export type MissionType = 'destroy' | 'hunt' | 'raid' | 'defend' | 'escort' | 'clear' | 'tutorial';
 export type MapSize = 'standard' | 'large';
 
 /**
@@ -66,7 +66,8 @@ export const MISSION_TYPES: Record<MissionType, { name: string; weight: number; 
   raid: { name: 'Convoy raid', weight: 2.5, payMult: 1.1, noun: 'trucks' },
   defend: { name: 'Defend', weight: 2.5, payMult: 1.1, noun: 'generators' },
   escort: { name: 'Escort', weight: 2.5, payMult: 1.1, noun: 'trucks' },
-  // Never rolled for a contract: launched from the title screen or the contract board.
+  clear: { name: 'Search & destroy', weight: 3, payMult: 1.05, noun: 'enemies' },
+  // Never rolled for a contract: launched from the title screen.
   tutorial: { name: 'Tutorial', weight: 0, payMult: 0, noun: 'steps' },
 };
 
@@ -140,6 +141,17 @@ export const HUNT = {
   /** Seconds between intel pings of the ace's position. */
   pingEvery: 20,
   callsigns: ['Grimjaw', 'Widowmaker', 'Saint Ashes', 'Red Iris', 'Hollowpoint', 'Old Thunder', 'Vesper', 'Kingfisher', 'Rust Baron', 'Nightjar'],
+};
+
+/**
+ * Search & destroy: outposts (turrets and guards, no uplinks), roaming tanks and the
+ * contract's mechs and drones. Destroy a share of every enemy unit on the map, then evac.
+ */
+export const CLEAR = {
+  /** Share of the enemy units (turrets, tanks, mechs, drones) you must destroy (rounded up). */
+  required: 0.75,
+  /** Roaming tanks on top of the usual ones, so the hunt has more to find between outposts. */
+  extraRoamers: 2,
 };
 
 /** Convoy raid: trucks drive across the map along a road; stop enough of them before they get away. */

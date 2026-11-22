@@ -1,4 +1,5 @@
 import type { MissionType } from '../../data/missions';
+import { ClearMission } from './ClearMission';
 import { DefendMission } from './DefendMission';
 import { DestroyMission } from './DestroyMission';
 import { EscortMission } from './EscortMission';
@@ -15,6 +16,7 @@ const MISSIONS: Record<MissionType, new (host: MissionHost) => Mission> = {
   raid: RaidMission,
   defend: DefendMission,
   escort: EscortMission,
+  clear: ClearMission,
   tutorial: TutorialMission,
 };
 

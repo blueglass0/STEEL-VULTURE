@@ -1,7 +1,7 @@
 import type { Obstacle } from '../../core/collision';
 import { Rng } from '../../core/rng';
 import type { Vec } from '../../core/math';
-import { DEFEND, DESTROY_TARGETS, ESCORT, HUNT, MAP_SIZES, RAID, TUTORIAL, type MapSize, type MissionType } from '../../data/missions';
+import { CLEAR, DEFEND, DESTROY_TARGETS, ESCORT, HUNT, MAP_SIZES, RAID, TUTORIAL, type MapSize, type MissionType } from '../../data/missions';
 import type { CombatDifficulty } from '../../data/difficulty';
 import { ECONOMY } from '../../data/economy';
 
@@ -167,7 +167,7 @@ export function generateMap(seed: number, difficulty: CombatDifficulty, opts: Ma
 
   // Sites (uplink bases or outposts): far from the drop point and from each other. Escort
   // ambushes sit beside the road instead; defend missions have none.
-  const siteCount = { destroy: opts.targets, hunt: HUNT.outposts, raid: RAID.outposts, defend: 0, escort: 0, tutorial: 0 }[opts.mission];
+  const siteCount = { destroy: opts.targets, hunt: HUNT.outposts, raid: RAID.outposts, defend: 0, escort: 0, clear: opts.targets, tutorial: 0 }[opts.mission];
   const sites: Vec[] = [];
   if (opts.mission === 'escort' && convoy) {
     const { start, end } = convoy;
@@ -375,7 +375,8 @@ export function generateMap(seed: number, difficulty: CombatDifficulty, opts: Ma
   const guards = Math.round(T.tanksPerTarget * difficulty.enemyCount);
   for (const s of sites) for (let i = 0; i < guards; i++) placeTank(s, 380, s);
   // Defend missions have no standing army: everything comes in waves.
-  const roamers = opts.mission === 'defend' ? 0 : Math.round(rng.int(T.roamingTanks[0], T.roamingTanks[1]) * difficulty.enemyCount * area);
+  const roamerCount = rng.int(T.roamingTanks[0], T.roamingTanks[1]) + (opts.mission === 'clear' ? CLEAR.extraRoamers : 0);
+  const roamers = opts.mission === 'defend' ? 0 : Math.round(roamerCount * difficulty.enemyCount * area);
   for (let i = 0; i < roamers; i++) {
     const p = { x: rng.range(400, W - 400), y: rng.range(400, H - 900) };
     placeTank(p, 200, p);

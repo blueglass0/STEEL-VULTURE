@@ -136,17 +136,15 @@ export function play(id: SoundId, volume = 1, rate = 1): void {
   pitch = rate * (1 + (Math.random() * 2 - 1) * vary * 0.5);
   switch (id) {
     case 'step': {
-      // A metal foot landing. Phone speakers can't play much below ~300 Hz, so the parts you
-      // hear everywhere are the clank (two partials 2.76× apart, the ratio that reads as a
-      // struck metal bar) and the grit crunching under it; the thud adds weight on headphones.
+      // Many tons landing: a deep thud with nothing that rings. Phone speakers can't play the
+      // thud's real pitch (40-90 Hz), so it's soft-clipped to add its harmonics (2f, 3f, 4f...)
+      // and the ear fills in the missing low note ("missing fundamental").
       const w = stepWeight;
-      tone(now, 'triangle', 330, 290, 0.09 + 0.06 * w, 0.2 * v);
-      tone(now, 'square', 910, 800, 0.045, 0.035 * v);
-      burst(now, 0.07 + 0.05 * w, 1250, 'bandpass', 0.42 * v, 1.1);
-      burst(now, 0.12 + 0.12 * w, 260, 'lowpass', (0.28 + 0.22 * w) * v);
-      tone(now, 'sine', 90, 34, 0.12 + 0.14 * w, (0.22 + 0.18 * w) * v);
-      // Hydraulics settling just after the foot lands.
-      burst(now + 0.035, 0.07, 4200, 'highpass', 0.06 * v);
+      thud(now, 95, 42, 0.18 + 0.16 * w, (0.4 + 0.06 * w) * v, 4 + 3 * w);
+      // The impact itself: a short, dull knock of low-passed noise.
+      burst(now, 0.05 + 0.05 * w, 650, 'lowpass', 0.6 * v);
+      // Dirt and debris settling, quiet and dark.
+      burst(now + 0.025, 0.12 + 0.08 * w, 800, 'bandpass', 0.1 * v, 0.7);
       break;
     }
     case 'hurt':
@@ -362,6 +360,54 @@ function burst(t: number, dur: number, freq: number, type: BiquadFilterType, gai
   g.gain.exponentialRampToValueAtTime(0.001, t + dur);
   src.connect(f).connect(g).connect(master!);
   src.start(t, Math.random() * 0.2, dur);
+}
+
+/** Soft-clipper curves by drive, shared (asymmetric, so even harmonics come through too). */
+const shaperCurves = new Map<number, Float32Array>();
+function shaperCurve(drive: number): Float32Array {
+  const key = Math.round(drive * 4) / 4;
+  let c = shaperCurves.get(key);
+  if (!c) {
+    c = new Float32Array(1024);
+    const off = 0.25;
+    // Scale by the larger swing (the negative side, with the offset) so output stays within ±1.
+    const norm = Math.tanh(key * (1 - off)) + Math.tanh(key * off);
+    for (let i = 0; i < c.length; i++) {
+      const x = (i / (c.length - 1)) * 2 - 1;
+      c[i] = (Math.tanh(key * (x + off)) - Math.tanh(key * off)) / norm;
+    }
+    shaperCurves.set(key, c);
+  }
+  return c;
+}
+
+/**
+ * A heavy impact: a sine dropping from f0 to f1 Hz, driven into a soft clipper (harmonics a
+ * small speaker can play), cleaned of DC and harshness, with a fast attack and a long decay.
+ */
+function thud(t: number, f0: number, f1: number, dur: number, gain: number, drive: number): void {
+  const c = ctx!;
+  const o = c.createOscillator();
+  o.type = 'sine';
+  o.frequency.setValueAtTime(f0 * pitch, t);
+  o.frequency.exponentialRampToValueAtTime(Math.max(20, f1 * pitch), t + dur * 0.6);
+  const pre = c.createGain();
+  pre.gain.setValueAtTime(0.0001, t);
+  pre.gain.exponentialRampToValueAtTime(1, t + 0.006);
+  pre.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  const shaper = c.createWaveShaper();
+  shaper.curve = shaperCurve(drive) as Float32Array<ArrayBuffer>;
+  const hp = c.createBiquadFilter();
+  hp.type = 'highpass';
+  hp.frequency.value = 45;
+  const lp = c.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 900;
+  const g = c.createGain();
+  g.gain.value = gain;
+  o.connect(pre).connect(shaper).connect(hp).connect(lp).connect(g).connect(master!);
+  o.start(t);
+  o.stop(t + dur + 0.02);
 }
 
 function tone(t: number, type: OscillatorType, f0: number, f1: number, dur: number, gain: number): void {

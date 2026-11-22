@@ -50,7 +50,7 @@ function problems(m: MissionMap, world: CollisionWorld, nav: NavGrid): string[] 
 }
 
 describe('map generation', () => {
-  const missions: MissionType[] = ['destroy', 'hunt', 'raid', 'defend', 'escort'];
+  const missions: MissionType[] = ['destroy', 'hunt', 'raid', 'defend', 'escort', 'clear'];
   for (const mission of missions) {
     for (const size of ['standard', 'large'] as MapSize[]) {
       it(`${mission} / ${size}: everything reachable over ${SEEDS} seeds`, () => {
@@ -69,6 +69,10 @@ describe('map generation', () => {
     expect(build(11, 'destroy', 'standard').m.targets).toHaveLength(3);
     expect(build(11, 'hunt', 'standard').m.units.filter((u) => u.role === 'ace')).toHaveLength(1);
     expect(build(11, 'raid', 'standard').m.convoy).toBeDefined();
+    const clear = build(11, 'clear', 'standard').m;
+    expect(clear.targets).toHaveLength(0);
+    expect(clear.sites).toHaveLength(3);
+    expect(clear.turrets.length + clear.tanks.length).toBeGreaterThanOrEqual(10);
     expect(build(11, 'escort', 'standard').m.convoy).toBeDefined();
     const d = build(11, 'defend', 'standard').m.defense;
     expect(d?.generators.length).toBeGreaterThan(0);

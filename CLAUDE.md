@@ -412,6 +412,17 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
 - MapScene: `objectives` (uplinks / ace / trucks), `required`, `escaped`; `setupObjectives`,
   `updateObjectives`, `objectivesDone`. Dev "Win mission" kills every objective.
 
+## Search & destroy notes (after the M11 playtest)
+
+- `MissionType` 'clear' (`MISSION_TYPES.clear`, weight 3, pay ×1.05; `CLEAR` in data/missions):
+  outposts like destroy missions (`Contract.targets` = outpost count by tier) but no uplinks,
+  `CLEAR.extraRoamers` (2) more roaming tanks, plus the contract's mechs and drones.
+  `ClearMission`: objectives = every enemy unit at the start except structures and trucks;
+  destroy `CLEAR.required` (75%, rounded up) then evac. When no remaining objective is on your
+  sensors (`detection !== 'hidden'`), one HUD arrow points at the nearest. Tier-2 sample: 20
+  units, 15 required. Map gen consumes the RNG the same way for other mission types, so their
+  seeds are unchanged.
+
 ## Defend and escort notes (M10 part 2)
 
 - Enemy AI is foe-generic: `Enemy.foe` (the player, or `Enemy.objective`, a friendly `Foe` =
@@ -470,11 +481,14 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
   missions (`startAmbience`/`stopAmbience`).
 - Sound pass after the M11 playtest: phone speakers play little below ~300 Hz, and the old step
   (220 Hz thud) and ambience (160 Hz rumble) were inaudible on phones (−60 to −68 dB above
-  300 Hz). Footsteps are now a metal clank (330/910 Hz partials, the 2.76 metal-bar ratio) +
-  grit crunch + a lighter thud; ambience adds an engine drone (two detuned 46 Hz saws through a
+  300 Hz). Footsteps (second try, after the user found the metal clank too "steel drum"): a
+  deep thud via `thud()`: a sine falling 95→42 Hz (× `stepPitch`) through an asymmetric tanh
+  soft-clipper (`shaperCurve`, even + odd harmonics) so phone speakers imply the missing low
+  fundamental, high-passed at 45 Hz (DC, sub boom) and low-passed at 900 Hz (no ringing), plus a
+  dull low-passed noise knock and quiet debris. Spectral centroid 85–145 Hz. Ambience adds an engine drone (two detuned 46 Hz saws through a
   low-pass) that opens up with walking speed and dies down during heat shutdown
   (`setEngineLoad(load, tonnage, running)`, called every frame from MapScene; only real changes
-  touch the audio graph). Measured offline (`__setContextForTest`, dev only): steps −45/−41/−35
+  touch the audio graph). Measured offline (`__setContextForTest`, dev only): steps −41/−38/−33
   dB (light/medium/assault; cannon shot −32), idle engine −47 dB, walking −43 dB.
 - Test scripts may still click `.card:not(.tutorial)`; harmless now that the card is gone.
 
