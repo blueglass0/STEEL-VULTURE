@@ -1,9 +1,9 @@
 import { CHASSIS, CHASSIS_ORDER, type Section } from '../data/chassis';
 import { COMBAT_DIFFICULTY } from '../data/difficulty';
-import { CONTRACT_FLAVOR, DEFEND_FLAVOR, ECONOMY, ECONOMY_DIFFICULTY, ESCORT_FLAVOR, HUNT_FLAVOR, RAID_FLAVOR } from '../data/economy';
+import { CLEAR_FLAVOR, CONTRACT_FLAVOR, DEFEND_FLAVOR, ECONOMY, ECONOMY_DIFFICULTY, ESCORT_FLAVOR, HUNT_FLAVOR, RAID_FLAVOR } from '../data/economy';
 import { FACTIONS, FACTION_ORDER, OPEN_MARKET, REPUTATION, type FactionId } from '../data/factions';
 import { STARTER_LOADOUT } from '../data/loadouts';
-import { DEFEND, DESTROY_TARGETS, ESCORT, HUNT, MAP_SIZES, MISSION_TYPES, RAID, type MapSize, type MissionType } from '../data/missions';
+import { CLEAR, DEFEND, DESTROY_TARGETS, ESCORT, HUNT, MAP_SIZES, MISSION_TYPES, RAID, type MapSize, type MissionType } from '../data/missions';
 import { ENEMIES } from '../data/enemies';
 import { WEAPONS } from '../data/weapons';
 import { EQUIPMENT } from '../data/equipment';
@@ -484,8 +484,9 @@ function makeContract(s: CareerState): Contract {
   const aceTypes = FACTIONS[enemyFaction].army.mechTypes[3];
   const ace = mission === 'hunt' ? pick(aceTypes).type : undefined;
   const aceName = mission === 'hunt' ? pick(HUNT.callsigns) : undefined;
-  const targets = { destroy: t.targets, hunt: 1, raid: RAID.trucks[tier], defend: DEFEND.generators, escort: ESCORT.trucks[tier], tutorial: 0 }[mission];
-  const flavors = { destroy: CONTRACT_FLAVOR, hunt: HUNT_FLAVOR, raid: RAID_FLAVOR, defend: DEFEND_FLAVOR, escort: ESCORT_FLAVOR, tutorial: CONTRACT_FLAVOR }[mission];
+  // Search & destroy: `targets` is the number of outposts.
+  const targets = { destroy: t.targets, hunt: 1, raid: RAID.trucks[tier], defend: DEFEND.generators, escort: ESCORT.trucks[tier], clear: t.targets, tutorial: 0 }[mission];
+  const flavors = { destroy: CONTRACT_FLAVOR, hunt: HUNT_FLAVOR, raid: RAID_FLAVOR, defend: DEFEND_FLAVOR, escort: ESCORT_FLAVOR, clear: CLEAR_FLAVOR, tutorial: CONTRACT_FLAVOR }[mission];
   const limited = Math.random() < ECONOMY.tonnageLimitChance;
   const maxTonnage = limited ? pick(ECONOMY.tonnageLimits) : undefined;
   const base = (t.payout[0] + Math.random() * (t.payout[1] - t.payout[0])) * econ(s).payouts;
@@ -653,6 +654,8 @@ export function objectiveText(k: Contract): string {
       return `hold ${k.targets} generators through ${DEFEND.waves[k.tier]} attack waves`;
     case 'escort':
       return `get ${escortRequired(k.targets)} of ${k.targets} trucks across`;
+    case 'clear':
+      return `destroy ${Math.round(CLEAR.required * 100)}% of the enemy force (${k.targets} outposts)`;
     default:
       return `destroy ${k.targets} uplinks`;
   }

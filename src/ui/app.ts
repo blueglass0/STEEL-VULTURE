@@ -224,21 +224,9 @@ export class App {
       if (contract) return this.deployPanel(c, contract);
       this.selectedContract = null;
     }
-    // New pilots: the tutorial sits first on the board until it's been played.
-    const tutorialCard =
-      c.stats.missions === 0 && !settings.tutorialSeen
-        ? h(
-            'button',
-            { type: 'button', class: 'card tutorial', onclick: () => this.startTutorial() },
-            h('div', { class: 'card-top' }, h('span', { class: 'tier' }, 'Training · free'), h('span', { class: 'pay' }, '2 min')),
-            h('div', { class: 'card-title' }, 'New pilot? Run the tutorial'),
-            h('div', { class: 'muted small' }, 'Walk, shoot, manage heat, repair, fight a tank, evac. A loaner mech: nothing costs you anything.'),
-          )
-        : null;
     return h(
       'div',
       { class: 'cards' },
-      tutorialCard,
       c.contracts.map((k) =>
         h(
           'button',
@@ -842,8 +830,6 @@ export class App {
     this.game.scene.stop('Hud');
     if (this.tutorialRunning) {
       this.tutorialRunning = false;
-      settings.tutorialSeen = true;
-      saveSettings();
       return this.showTutorialEnd(o.won);
     }
     if (this.quick || !this.career) {

@@ -412,6 +412,17 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
 - MapScene: `objectives` (uplinks / ace / trucks), `required`, `escaped`; `setupObjectives`,
   `updateObjectives`, `objectivesDone`. Dev "Win mission" kills every objective.
 
+## Search & destroy notes (after the M11 playtest)
+
+- `MissionType` 'clear' (`MISSION_TYPES.clear`, weight 3, pay ×1.05; `CLEAR` in data/missions):
+  outposts like destroy missions (`Contract.targets` = outpost count by tier) but no uplinks,
+  `CLEAR.extraRoamers` (2) more roaming tanks, plus the contract's mechs and drones.
+  `ClearMission`: objectives = every enemy unit at the start except structures and trucks;
+  destroy `CLEAR.required` (75%, rounded up) then evac. When no remaining objective is on your
+  sensors (`detection !== 'hidden'`), one HUD arrow points at the nearest. Tier-2 sample: 20
+  units, 15 required. Map gen consumes the RNG the same way for other mission types, so their
+  seeds are unchanged.
+
 ## Defend and escort notes (M10 part 2)
 
 - Enemy AI is foe-generic: `Enemy.foe` (the player, or `Enemy.objective`, a friendly `Foe` =
@@ -454,20 +465,32 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
 
 - Tutorial (`MissionType` 'tutorial', weight 0 so contracts never roll it; `TUTORIAL` in
   data/missions.ts): a hand-laid 2000² map (`tutorialMap` in mapgen) and six steps driven by
-  `MapScene.updateTutorial`/`enterTutorialStep`: walk to a marker, destroy a practice target
+  `TutorialMission` (game/missions): walk to a marker, destroy a practice target
   (`dummy`) with group 1, another with group 2 (heat), repair at a free pad after scripted damage,
   kill one light tank (enemy damage ×0.3), evac. `tutorialText()` words each prompt for the
-  device, movement scheme and phone firing mode. Launched from the title screen ("Tutorial (2
-  min)") or a card on the contract board while the career has no missions and
-  `settings.tutorialSeen` is false (`App.startTutorial`): a loaner Vulture, zero field prices,
-  nothing touches the career; the end screen returns to the hangar or title.
+  device, movement scheme and phone firing mode. Launched only from the title screen ("Tutorial
+  (2 min)"; the contract-board card was removed after the M11 playtest as nagging)
+  (`App.startTutorial`): a loaner Vulture, zero field prices, nothing touches the career; the
+  end screen returns to the hangar or title.
 - Station prompts now decide "nothing to do" from need, not cost (free pads say "free").
 - Sound (`core/audio.ts`): `play(id, volume, rate)`; `VARIED` sounds get random pitch.
-  New: footsteps for the player and enemy mechs (`stepPitch(tonnage)`: heavier = lower),
+  New: footsteps for the player and enemy mechs (`playStep(tonnage, volume)`: heavier = lower,
+  longer and louder, a Kestrel ~60% of a Roc),
   `hurt` when the player takes damage, `powerDown`/`powerUp` on overheat shutdown and restart,
   `repair` at a repair pad, `win`/`lose` stings, and a quiet low-passed noise ambience during
   missions (`startAmbience`/`stopAmbience`).
-- Test scripts must click `.card:not(.tutorial)`: in a fresh browser the tutorial card is first.
+- Sound pass after the M11 playtest: phone speakers play little below ~300 Hz, and the old step
+  (220 Hz thud) and ambience (160 Hz rumble) were inaudible on phones (−60 to −68 dB above
+  300 Hz). Footsteps (second try, after the user found the metal clank too "steel drum"): a
+  deep thud via `thud()`: a sine falling 95→42 Hz (× `stepPitch`) through an asymmetric tanh
+  soft-clipper (`shaperCurve`, even + odd harmonics) so phone speakers imply the missing low
+  fundamental, high-passed at 45 Hz (DC, sub boom) and low-passed at 900 Hz (no ringing), plus a
+  dull low-passed noise knock and quiet debris. Spectral centroid 85–145 Hz. Ambience adds an engine drone (two detuned 46 Hz saws through a
+  low-pass) that opens up with walking speed and dies down during heat shutdown
+  (`setEngineLoad(load, tonnage, running)`, called every frame from MapScene; only real changes
+  touch the audio graph). Measured offline (`__setContextForTest`, dev only): steps −41/−38/−33
+  dB (light/medium/assault; cannon shot −32), idle engine −47 dB, walking −43 dB.
+- Test scripts may still click `.card:not(.tutorial)`; harmless now that the card is gone.
 
 ## Conventions
 

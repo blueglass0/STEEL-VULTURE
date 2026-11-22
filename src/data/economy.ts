@@ -139,6 +139,12 @@ export const ESCORT_FLAVOR = [
   'Escort a {employer} supply run past {enemy} positions. The drivers won\'t move without you close by.',
 ];
 
+export const CLEAR_FLAVOR = [
+  'The {enemy} have dug in across the sector. {employer} wants their forces broken, not just pushed back.',
+  '{employer} pays by the wreck: find the {enemy} outposts and patrols and take them apart.',
+  'A {enemy} battlegroup is staging here. Thin it out for {employer} before it moves.',
+];
+
 export const CONTRACT_FLAVOR = [
   'The {enemy} have been coordinating raids through a string of uplink towers. {employer} wants them gone.',
   '{employer} needs the {enemy} relay network silenced before their convoy moves through.',
