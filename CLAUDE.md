@@ -4,6 +4,11 @@ Top-down real-time mech game. Full design and milestone plan: `docs/PLAN.md`. Re
 
 ## Current milestone
 
+**Repository moved (Nov 2026):** the project now lives in `blueglass0/STEEL-VULTURE`, with history
+rewritten so commits carry the user's GitHub noreply address instead of a personal email. The old
+`blueglass0/SVMECH` repository is superseded (to be deleted by the user); never push old history
+or old clones to the new repository.
+
 **Milestone 13 (Salvage + balance report): built, awaiting the user's playtest.** M1–M11 played,
 playtest follow-ups done. Next in `docs/PLAN.md`: 14 Artillery and support enemies (incl. player
 artillery), 15 Chassis abilities, then maybe 16 Chassis expansion (notes in
