@@ -4,10 +4,12 @@ Top-down real-time mech game. Full design and milestone plan: `docs/PLAN.md`. Re
 
 ## Current milestone
 
-**Milestone 11 (both parts) — settings, phone controls rework, quality options, tutorial,
-sound pass: built, awaiting the user's playtest** (the user will merge and test everything at
-once). M1–M10 played (defend/escort still being tuned). The plan's milestones are done except
-the optional 12 (final mission, maybe someday); next steps come from playtest feedback.
+**Milestone 13 (Salvage + balance report): built, awaiting the user's playtest.** M1–M11 played,
+playtest follow-ups done. Next in `docs/PLAN.md`: 14 Artillery and support enemies (incl. player
+artillery), 15 Chassis abilities, then maybe 16 Chassis expansion (notes in
+`docs/MECH_LINEUP.md`). The user keeps a roadmap page (claude.ai artifact
+https://claude.ai/artifact/9muLYNhBRhJK2xHiABzxMh, source in the session scratchpad); update it
+when a milestone ships. Optional 12 (final mission) still "someday".
 Deferred by the user: line-of-sight shadow rendering (logic already hides enemies behind
 walls); revisit as a graphics option, likely in M11.
 Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back into `src/data/`.
@@ -54,6 +56,10 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
     laser turret 11 (was 15). Machine-gun vehicles and drones +1–1.5° spread.
   - Contract tiers scale tank/turret/drone damage (`ECONOMY.tiers[n].vehicleDamage`: 0.8 / 0.9 / 1)
     via `MissionConfig.vehicleDamage`; enemy mechs use `enemyDamage` (combat difficulty only).
+- **Armor plating brings its armor** (after the M11 playtest): installing it adds its armor to
+  every section that isn't destroyed, free; removing it takes the armor back (damage stays the
+  same, so remove + refit isn't a free repair) and is refused if a section has less armor left
+  than the plating gives (`removeEquipment` returns the reason; `App.act` shows returned strings).
 - **Chassis feel:** heavier chassis get lower turn rates and more momentum (lower accel/decel),
   lights turn and accelerate quicker. The movement numbers in `chassis.ts` are enough to make
   chassis feel distinct (user-approved, M2).
@@ -411,6 +417,43 @@ Tuning loop: the user tunes with the `?debug` Tune panel and pastes values back 
   nearest truck. Road length ~2200 (standard) / ~3500 (large).
 - MapScene: `objectives` (uplinks / ace / trucks), `required`, `escaped`; `setupObjectives`,
   `updateObjectives`, `objectivesDone`. Dev "Win mission" kills every objective.
+
+## Salvage notes (M13)
+
+- Numbers in `src/data/salvage.ts` (`SALVAGE`). Logic: `career/salvage.ts` (pure `rollSalvage`,
+  `vehicleScrap`) and the salvage section of `career.ts` (`salvageExpected`, `contractPay`,
+  `claimSalvage`, `assembleChassis`, `sellPart`, `partSellPrice`, `assemblyFee`,
+  `salvageScrapValue`).
+- Contract terms (`Contract.terms`, chosen in the deploy panel only when `salvageExpected`: enemy
+  mechs on the contract or a hunt; otherwise forced to full pay): full pay ×1 / 0 picks, balanced
+  ×0.8 / 2 picks, salvage rights ×0.55 / 4 picks. The bonus isn't reduced.
+- `MapScene.onEnemyDestroyed` records `MissionOutcome.destroyed` (`DestroyedUnit`: enemy id, name,
+  arms an enemy mech had lost, `ace` from `EnemyMech.isAce`). Escaped trucks aren't included.
+- On a win (`completeMission`): vehicle scrap (tank 500, turret 400, drone 150, truck 300, × economy
+  payouts) is paid as a debrief line on any terms. Enemy mech wrecks roll a pool with a seeded
+  `Rng(contract.seed + missions × 7919)`: each weapon 55% (15% on a shot-off arm), equipment 40%,
+  reactors 25%, one chassis part per mech (2 for the ace). Full pay: the employer keeps the pool.
+  Otherwise `CareerState.pendingSalvage` holds it until picked (survives reloads; `showHangar`
+  redirects to `App.showSalvage`). Unpicked items sell for 10% of their value (`scrapShare`).
+  Failed or abandoned missions recover nothing.
+- Parts (`CareerState.parts`): 3 of a chassis assemble into a mech (Shop tab, "Salvaged parts")
+  for 30% of its price: the frame with its stock equipment, no weapons, no ammo. A part sells for
+  8% of the chassis price and counts in `sellableValue`. Salvage ignores faction shop gates
+  (that's the point); better gear comes from higher tiers because their enemy mechs are heavier.
+- Save format 3 (`MIGRATIONS[2]`: `parts`, `pendingSalvage`); `repairCareer` drops parts and
+  pending items whose data no longer exists.
+- Measured in a test run: two enemy mechs (trooper + brawler) left 8–11 items.
+
+## Balance report (M13)
+
+- `src/game/balance.ts`: pure arithmetic from the data (every shot hits, no movement): weapon DPS,
+  heat/s, ammo/s and ¢/s, DPS per ton, damage per heat, ¢ per DPS; stock mechs' sustained DPS
+  (heat-limited), seconds to overheat, effective HP (torso ÷ 0.85); enemies' effective HP and DPS;
+  a stock-mech-vs-enemy-mech table of seconds to kill / seconds to die. Outliers: more than 1.5×
+  from the median of weapons with the same mount size and kind.
+- `npm run balance` regenerates `docs/BALANCE.md` (vitest with `vitest.report.config.ts`, runner
+  in `tests/report/`, type-checked by `tsconfig.node.json`). Not part of `npm test`;
+  `tests/balance.test.ts` checks the numbers stay finite. Rerun after changing weapon or chassis data.
 
 ## Search & destroy notes (after the M11 playtest)
 

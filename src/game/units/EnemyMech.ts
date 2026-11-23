@@ -27,6 +27,8 @@ const BARS: { section: Section; x: number; w: number; y: number; h: number }[] =
  */
 export class EnemyMech extends Enemy {
   readonly mech: Mech;
+  /** The hunted ace of a mech hunt (more salvage). */
+  isAce = false;
   private m: EnemyMechDef;
   private input: PilotInput;
   private move: Vec = { x: 0, y: 0 };

@@ -23,12 +23,12 @@ import { Effects } from '../game/combat/Effects';
 import type { Unit } from '../game/combat/types';
 import { hud } from '../game/hudState';
 import { Mech } from '../game/units/Mech';
-import { Enemy, Structure, Tank, Turret, createEnemy, type AiContext } from '../game/units/Enemies';
+import { Enemy, EnemyMech, Structure, Tank, Turret, createEnemy, type AiContext } from '../game/units/Enemies';
 import { NavGrid } from '../game/world/NavGrid';
 import { FogOverlay } from '../game/world/Fog';
 import { TerrainLayer } from '../game/world/TerrainLayer';
 import { STATION_RADIUS, generateMap, type MissionMap, type StationType } from '../game/world/mapgen';
-import type { MechState, MissionConfig, MissionOutcome } from '../career/types';
+import type { DestroyedUnit, MechState, MissionConfig, MissionOutcome } from '../career/types';
 import { newCareer } from '../career/career';
 import { ConvoyTruck, FriendlyUnit } from '../game/units/Friendly';
 import { createMission, type Mission, type MissionHost } from '../game/missions';
@@ -126,6 +126,8 @@ export class MapScene extends Phaser.Scene {
   /** Your side's units on defend/escort missions (generators, convoy trucks). */
   private friendlies: FriendlyUnit[] = [];
   private devMechIndex = 0;
+  /** Enemy units destroyed this mission (scrap and salvage). */
+  private destroyedUnits: DestroyedUnit[] = [];
   /** What mission controllers see of the scene. */
   private readonly host: MissionHost = this.makeHost();
 
@@ -148,6 +150,7 @@ export class MapScene extends Phaser.Scene {
     this.structures = [];
     this.friendlies = [];
     this.dead.clear();
+    this.destroyedUnits = [];
   }
 
   create(): void {
@@ -589,6 +592,13 @@ export class MapScene extends Phaser.Scene {
 
   private onEnemyDestroyed(e: Enemy): void {
     this.dead.add(e);
+    // For scrap and salvage (M13): what it was, and which arms an enemy mech had lost.
+    const unit: DestroyedUnit = { type: e.def.id, name: e.def.name };
+    if (e instanceof EnemyMech) {
+      unit.lost = (['leftArm', 'rightArm'] as const).filter((s) => e.mech.sections.destroyed(s));
+      if (e.isAce) unit.ace = true;
+    }
+    this.destroyedUnits.push(unit);
     e.destroy(this.fx);
     if (!(e instanceof Structure)) {
       this.kills++;
@@ -666,6 +676,7 @@ export class MapScene extends Phaser.Scene {
         mechs: [...this.deployed.map((m) => m.toState()), ...this.backupQueue],
         backupsUsed: this.deployed.length - 1,
         fieldCosts: this.fieldCosts,
+        destroyed: this.destroyedUnits,
       };
       this.game.events.emit('mission-end', outcome);
     }
